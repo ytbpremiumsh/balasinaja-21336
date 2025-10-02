@@ -217,7 +217,7 @@ async function generateAiReply(supabase: any, question: string): Promise<string>
 
 async function sendOneSenderMessage(to: string, type: string, text: string, image: string): Promise<boolean> {
   try {
-    const apiUrl = 'https://api.onesender.id/api/v1/message/send';
+    const apiUrl = 'http://194.127.192.254:3002/api/v1/messages/send';
     const apiKey = Deno.env.get('ONESENDER_API_KEY');
 
     if (!apiKey) {
