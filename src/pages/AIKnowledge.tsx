@@ -1,0 +1,174 @@
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { Layout } from "@/components/Layout";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Bot, Plus, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+
+interface Knowledge {
+  id: string;
+  question: string;
+  answer: string;
+  created_at: string;
+}
+
+export default function AIKnowledge() {
+  const [knowledge, setKnowledge] = useState<Knowledge[]>([]);
+  const [question, setQuestion] = useState("");
+  const [answer, setAnswer] = useState("");
+
+  useEffect(() => {
+    fetchKnowledge();
+  }, []);
+
+  const fetchKnowledge = async () => {
+    const { data, error } = await supabase
+      .from("ai_knowledge_base")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("Error fetching knowledge:", error);
+    } else {
+      setKnowledge(data || []);
+    }
+  };
+
+  const handleAdd = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const { error } = await supabase.from("ai_knowledge_base").insert({
+      question: question.trim(),
+      answer: answer.trim(),
+    });
+
+    if (error) {
+      toast.error("Gagal menambah knowledge: " + error.message);
+    } else {
+      toast.success("Knowledge berhasil ditambahkan!");
+      setQuestion("");
+      setAnswer("");
+      fetchKnowledge();
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Hapus knowledge ini?")) return;
+
+    const { error } = await supabase.from("ai_knowledge_base").delete().eq("id", id);
+
+    if (error) {
+      toast.error("Gagal menghapus knowledge");
+    } else {
+      toast.success("Knowledge berhasil dihapus");
+      fetchKnowledge();
+    }
+  };
+
+  return (
+    <Layout>
+      <div className="space-y-6 animate-fade-in">
+        <div>
+          <h1 className="text-4xl font-bold flex items-center gap-3">
+            <Bot className="w-8 h-8 text-primary" />
+            AI Knowledge Base
+          </h1>
+          <p className="text-muted-foreground mt-2">
+            Data ini digunakan AI sebagai konteks untuk memberikan jawaban yang lebih akurat
+          </p>
+        </div>
+
+        {/* Add Form */}
+        <Card className="shadow-card gradient-card">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Plus className="w-5 h-5" />
+              Tambah Knowledge Baru
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleAdd} className="space-y-4">
+              <div>
+                <Label htmlFor="question">Pertanyaan</Label>
+                <Textarea
+                  id="question"
+                  value={question}
+                  onChange={(e) => setQuestion(e.target.value)}
+                  placeholder="Contoh pertanyaan yang sering ditanyakan pengguna"
+                  rows={2}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="answer">Jawaban</Label>
+                <Textarea
+                  id="answer"
+                  value={answer}
+                  onChange={(e) => setAnswer(e.target.value)}
+                  placeholder="Jawaban yang diharapkan dari AI"
+                  rows={3}
+                  required
+                />
+              </div>
+              <Button type="submit" className="w-full">
+                <Plus className="w-4 h-4 mr-2" />
+                Simpan Knowledge
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        {/* List */}
+        <Card className="shadow-card">
+          <CardHeader>
+            <CardTitle>Daftar Knowledge Base ({knowledge.length})</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {knowledge.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  Belum ada data knowledge base. Tambahkan data pertama Anda di atas!
+                </div>
+              ) : (
+                knowledge.map((kb) => (
+                  <div
+                    key={kb.id}
+                    className="p-4 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 space-y-2">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-xs font-semibold text-primary">Q:</span>
+                          </div>
+                          <p className="text-sm font-medium">{kb.question}</p>
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-xs font-semibold text-success">A:</span>
+                          </div>
+                          <p className="text-sm text-muted-foreground">{kb.answer}</p>
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDelete(kb.id)}
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10 flex-shrink-0"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </Layout>
+  );
+}
