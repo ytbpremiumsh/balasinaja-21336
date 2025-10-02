@@ -1,0 +1,79 @@
+<%- include('partials/header') %>
+
+<div class="row">
+  <div class="col-12">
+    <div class="card shadow-sm">
+      <div class="card-header bg-primary text-white">
+        <h5 class="mb-0"><i class="bi bi-gear"></i> Pengaturan Aplikasi</h5>
+      </div>
+      <div class="card-body">
+        <div class="alert alert-warning">
+          <i class="bi bi-exclamation-triangle"></i>
+          <strong>Penting:</strong> Pengaturan ini dikelola melalui file <code>.env</code>. 
+          Setelah mengubah file .env, restart server dengan perintah <code>npm start</code>.
+        </div>
+
+        <h6 class="mt-4 mb-3 text-primary"><i class="bi bi-whatsapp"></i> OneSender Configuration</h6>
+        <table class="table table-bordered">
+          <tr>
+            <th style="width: 30%">API URL</th>
+            <td><code><%= settings.onesender_api_url || 'Not configured' %></code></td>
+          </tr>
+          <tr>
+            <th>API Key</th>
+            <td><code><%= settings.onesender_api_key %></code></td>
+          </tr>
+          <tr>
+            <th>Message Priority</th>
+            <td><code><%= settings.message_priority %></code></td>
+          </tr>
+        </table>
+
+        <h6 class="mt-4 mb-3 text-primary"><i class="bi bi-robot"></i> AI Configuration</h6>
+        <table class="table table-bordered">
+          <tr>
+            <th style="width: 30%">AI Vendor</th>
+            <td><code><%= settings.ai_vendor %></code></td>
+          </tr>
+          <tr>
+            <th>AI API Key</th>
+            <td><code><%= settings.ai_api_key %></code></td>
+          </tr>
+          <tr>
+            <th>AI Model</th>
+            <td><code><%= settings.ai_model %></code></td>
+          </tr>
+        </table>
+
+        <div class="card bg-light mt-4">
+          <div class="card-body">
+            <h6><i class="bi bi-lightbulb"></i> Supported AI Vendors:</h6>
+            <ul class="mb-0">
+              <li><strong>gemini</strong> - Google Gemini (Model: gemini-pro, gemini-1.5-pro)</li>
+              <li><strong>openai</strong> - OpenAI (Model: gpt-4, gpt-3.5-turbo)</li>
+              <li><strong>deepseek</strong> - DeepSeek (Model: deepseek-chat)</li>
+              <li><strong>openrouter</strong> - OpenRouter (Model: openrouter/auto atau model spesifik)</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="card bg-info text-white mt-3">
+          <div class="card-body">
+            <h6><i class="bi bi-link-45deg"></i> Webhook Endpoint</h6>
+            <p class="mb-0">
+              Daftarkan URL webhook ini di OneSender dashboard Anda:
+            </p>
+            <code class="text-white d-block mt-2 fs-6">
+              http://your-domain.com/api/webhook
+            </code>
+            <small class="d-block mt-2">
+              Untuk development lokal, gunakan tools seperti <strong>ngrok</strong> untuk membuat URL publik.
+            </small>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('partials/footer') %>

@@ -1,0 +1,72 @@
+<%- include('partials/header') %>
+
+<div class="row">
+  <div class="col-12">
+    <div class="card shadow-sm">
+      <div class="card-header bg-primary text-white">
+        <h5 class="mb-0"><i class="bi bi-inbox"></i> Inbox - Recent Messages</h5>
+      </div>
+      <div class="card-body">
+        <p class="text-muted">Menampilkan 50 pesan terakhir yang diterima</p>
+        
+        <div class="table-responsive">
+          <table class="table table-hover table-striped">
+            <thead class="table-dark">
+              <tr>
+                <th>Waktu</th>
+                <th>Nomor</th>
+                <th>Nama</th>
+                <th>Tipe</th>
+                <th>Pesan Masuk</th>
+                <th>Balasan</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% if (messages.length === 0) { %>
+                <tr>
+                  <td colspan="7" class="text-center text-muted py-4">
+                    <i class="bi bi-inbox fs-1"></i>
+                    <p class="mt-2">Belum ada pesan masuk</p>
+                  </td>
+                </tr>
+              <% } else { %>
+                <% messages.forEach(msg => { %>
+                  <tr>
+                    <td class="text-nowrap">
+                      <small><%= new Date(msg.created_at).toLocaleString('id-ID') %></small>
+                    </td>
+                    <td><%= msg.phone %></td>
+                    <td><%= msg.name || '-' %></td>
+                    <td>
+                      <span class="badge bg-info"><%= msg.inbox_type %></span>
+                    </td>
+                    <td>
+                      <div class="message-preview"><%= msg.inbox_message || '-' %></div>
+                    </td>
+                    <td>
+                      <div class="message-preview"><%= msg.reply_message || '-' %></div>
+                    </td>
+                    <td>
+                      <% if (msg.status === 'replied_trigger') { %>
+                        <span class="badge bg-success">Trigger</span>
+                      <% } else if (msg.status === 'replied_ai') { %>
+                        <span class="badge bg-primary">AI</span>
+                      <% } else if (msg.status === 'no_reply') { %>
+                        <span class="badge bg-warning">No Reply</span>
+                      <% } else { %>
+                        <span class="badge bg-secondary">Received</span>
+                      <% } %>
+                    </td>
+                  </tr>
+                <% }) %>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('partials/footer') %>

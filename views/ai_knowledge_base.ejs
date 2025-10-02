@@ -1,0 +1,93 @@
+<%- include('partials/header') %>
+
+<div class="row">
+  <div class="col-12">
+    <!-- Form Add New -->
+    <div class="card shadow-sm mb-4">
+      <div class="card-header bg-success text-white">
+        <h5 class="mb-0"><i class="bi bi-plus-circle"></i> Tambah Knowledge Base Baru</h5>
+      </div>
+      <div class="card-body">
+        <form action="/ai-knowledge/add" method="POST">
+          <div class="row g-3">
+            <div class="col-md-5">
+              <label class="form-label">Pertanyaan</label>
+              <textarea name="question" class="form-control" rows="2" placeholder="Contoh pertanyaan pengguna" required></textarea>
+            </div>
+            <div class="col-md-7">
+              <label class="form-label">Jawaban</label>
+              <textarea name="answer" class="form-control" rows="2" placeholder="Jawaban yang diharapkan dari AI" required></textarea>
+            </div>
+          </div>
+          <div class="mt-3">
+            <button type="submit" class="btn btn-success">
+              <i class="bi bi-save"></i> Simpan Knowledge
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- List Knowledge Base -->
+    <div class="card shadow-sm">
+      <div class="card-header bg-primary text-white">
+        <h5 class="mb-0"><i class="bi bi-robot"></i> AI Knowledge Base</h5>
+      </div>
+      <div class="card-body">
+        <p class="text-muted">
+          Data ini digunakan sebagai konteks tambahan untuk AI saat menjawab pertanyaan. 
+          AI akan merujuk pada informasi ini untuk memberikan jawaban yang lebih akurat.
+        </p>
+        
+        <div class="table-responsive">
+          <table class="table table-hover table-striped">
+            <thead class="table-dark">
+              <tr>
+                <th style="width: 5%">ID</th>
+                <th style="width: 35%">Pertanyaan</th>
+                <th style="width: 45%">Jawaban</th>
+                <th style="width: 10%">Dibuat</th>
+                <th style="width: 5%">Aksi</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% if (knowledge.length === 0) { %>
+                <tr>
+                  <td colspan="5" class="text-center text-muted py-4">
+                    <i class="bi bi-database fs-1"></i>
+                    <p class="mt-2">Belum ada data knowledge base. Tambahkan data pertama Anda di atas!</p>
+                  </td>
+                </tr>
+              <% } else { %>
+                <% knowledge.forEach(kb => { %>
+                  <tr>
+                    <td><%= kb.id %></td>
+                    <td>
+                      <div class="knowledge-text"><%= kb.question %></div>
+                    </td>
+                    <td>
+                      <div class="knowledge-text"><%= kb.answer %></div>
+                    </td>
+                    <td class="text-nowrap">
+                      <small><%= new Date(kb.created_at).toLocaleDateString('id-ID') %></small>
+                    </td>
+                    <td>
+                      <form action="/ai-knowledge/delete/<%= kb.id %>" method="POST" style="display:inline;"
+                            onsubmit="return confirm('Hapus knowledge ini?')">
+                        <button type="submit" class="btn btn-sm btn-danger">
+                          <i class="bi bi-trash"></i>
+                        </button>
+                      </form>
+                    </td>
+                  </tr>
+                <% }) %>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('partials/footer') %>
