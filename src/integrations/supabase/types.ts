@@ -14,7 +14,117 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      ai_knowledge_base: {
+        Row: {
+          answer: string
+          created_at: string | null
+          id: string
+          question: string
+        }
+        Insert: {
+          answer: string
+          created_at?: string | null
+          id?: string
+          question: string
+        }
+        Update: {
+          answer?: string
+          created_at?: string | null
+          id?: string
+          question?: string
+        }
+        Relationships: []
+      }
+      autoreplies: {
+        Row: {
+          content: string
+          created_at: string | null
+          id: string
+          message_type: string
+          trigger: string
+          url_image: string | null
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          id?: string
+          message_type?: string
+          trigger: string
+          url_image?: string | null
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          id?: string
+          message_type?: string
+          trigger?: string
+          url_image?: string | null
+        }
+        Relationships: []
+      }
+      contacts: {
+        Row: {
+          created_at: string | null
+          id: string
+          name: string | null
+          phone: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          name?: string | null
+          phone: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          name?: string | null
+          phone?: string
+        }
+        Relationships: []
+      }
+      inbox: {
+        Row: {
+          created_at: string | null
+          id: string
+          inbox_message: string | null
+          inbox_type: string | null
+          message_id: string
+          name: string | null
+          phone: string
+          reply_image: string | null
+          reply_message: string | null
+          reply_type: string | null
+          status: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          inbox_message?: string | null
+          inbox_type?: string | null
+          message_id: string
+          name?: string | null
+          phone: string
+          reply_image?: string | null
+          reply_message?: string | null
+          reply_type?: string | null
+          status?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          inbox_message?: string | null
+          inbox_type?: string | null
+          message_id?: string
+          name?: string | null
+          phone?: string
+          reply_image?: string | null
+          reply_message?: string | null
+          reply_type?: string | null
+          status?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
