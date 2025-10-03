@@ -16,6 +16,26 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchStats();
+
+    // Setup realtime subscription for inbox
+    const channel = supabase
+      .channel('dashboard-inbox-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'inbox'
+        },
+        () => {
+          fetchStats();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const fetchStats = async () => {

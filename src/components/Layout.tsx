@@ -1,6 +1,9 @@
-import { Link, useLocation } from "react-router-dom";
-import { MessageSquare, Inbox, Bot, Users, Settings, Sparkles } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { MessageSquare, Inbox, Bot, Users, Settings, Sparkles, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: Sparkles },
@@ -12,6 +15,17 @@ const navigation = [
 
 export const Layout = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      toast.error("Gagal logout");
+    } else {
+      toast.success("Berhasil logout");
+      navigate("/auth");
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -27,18 +41,29 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
             </span>
           </Link>
           
-          <Link 
-            to="/settings"
-            className={cn(
-              "flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors",
-              location.pathname === "/settings"
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground"
-            )}
-          >
-            <Settings className="w-4 h-4" />
-            Settings
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link 
+              to="/settings"
+              className={cn(
+                "flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors",
+                location.pathname === "/settings"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              )}
+            >
+              <Settings className="w-4 h-4" />
+              Settings
+            </Link>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleLogout}
+              className="flex items-center gap-2"
+            >
+              <LogOut className="w-4 h-4" />
+              Logout
+            </Button>
+          </div>
         </div>
       </header>
 
