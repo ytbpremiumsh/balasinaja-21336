@@ -164,6 +164,15 @@ serve(async (req) => {
 
 async function generateAiReply(supabase: any, question: string): Promise<string> {
   try {
+    // Get AI model from settings
+    const { data: aiModelSetting } = await supabase
+      .from('settings')
+      .select('value')
+      .eq('key', 'ai_model')
+      .single();
+
+    const aiModel = aiModelSetting?.value || 'google/gemini-2.5-flash';
+
     // Get knowledge base for context
     const { data: knowledge } = await supabase
       .from('ai_knowledge_base')
@@ -191,7 +200,7 @@ async function generateAiReply(supabase: any, question: string): Promise<string>
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: aiModel,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
@@ -217,11 +226,30 @@ async function generateAiReply(supabase: any, question: string): Promise<string>
 
 async function sendOneSenderMessage(to: string, type: string, text: string, image: string): Promise<boolean> {
   try {
-    const apiUrl = 'http://194.127.192.254:3002/api/v1/messages';
-    const apiKey = Deno.env.get('ONESENDER_API_KEY');
+    // Create supabase client to access settings
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    // Get API URL and Key from database settings
+    const { data: settingsData } = await supabase
+      .from('settings')
+      .select('key, value')
+      .in('key', ['onesender_api_url', 'onesender_api_key']);
+
+    const settingsMap: any = {};
+    if (settingsData) {
+      settingsData.forEach((setting: any) => {
+        settingsMap[setting.key] = setting.value;
+      });
+    }
+
+    const apiUrl = settingsMap.onesender_api_url || 'http://194.127.192.254:3002/api/v1/messages';
+    const apiKey = settingsMap.onesender_api_key || Deno.env.get('ONESENDER_API_KEY');
 
     if (!apiKey) {
-      console.error('ONESENDER_API_KEY not configured');
+      console.error('OneSender API key not configured');
       return false;
     }
 

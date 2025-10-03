@@ -9,7 +9,9 @@ import Autoreplies from "./pages/Autoreplies";
 import AIKnowledge from "./pages/AIKnowledge";
 import Contacts from "./pages/Contacts";
 import Settings from "./pages/Settings";
+import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
+import { ProtectedRoute } from "./components/ProtectedRoute";
 
 const queryClient = new QueryClient();
 
@@ -20,12 +22,13 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/inbox" element={<Inbox />} />
-          <Route path="/autoreplies" element={<Autoreplies />} />
-          <Route path="/ai-knowledge" element={<AIKnowledge />} />
-          <Route path="/contacts" element={<Contacts />} />
-          <Route path="/settings" element={<Settings />} />
+          <Route path="/auth" element={<Auth />} />
+          <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/inbox" element={<ProtectedRoute><Inbox /></ProtectedRoute>} />
+          <Route path="/autoreplies" element={<ProtectedRoute><Autoreplies /></ProtectedRoute>} />
+          <Route path="/ai-knowledge" element={<ProtectedRoute><AIKnowledge /></ProtectedRoute>} />
+          <Route path="/contacts" element={<ProtectedRoute><Contacts /></ProtectedRoute>} />
+          <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

@@ -1,9 +1,144 @@
 import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Settings as SettingsIcon, Webhook, Bot, Zap } from "lucide-react";
+import { Settings as SettingsIcon, Webhook, Bot, Zap, Save, Key } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+
+interface SettingRow {
+  id: string;
+  key: string;
+  value: string;
+  created_at: string;
+  updated_at: string;
+}
 
 export default function Settings() {
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
+  const [loadingPassword, setLoadingPassword] = useState(false);
+  
+  // Settings state
+  const [onesenderApiUrl, setOnesenderApiUrl] = useState("");
+  const [onesenderApiKey, setOnesenderApiKey] = useState("");
+  const [aiModel, setAiModel] = useState("");
+  
+  // Password change state
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  useEffect(() => {
+    loadSettings();
+  }, []);
+
+  const loadSettings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("settings" as any)
+        .select("*");
+
+      if (error) throw error;
+
+      if (data) {
+        const settingsMap = (data as any[]).reduce((acc: any, setting: any) => {
+          acc[setting.key] = setting.value;
+          return acc;
+        }, {});
+
+        setOnesenderApiUrl(settingsMap.onesender_api_url || "");
+        setOnesenderApiKey(settingsMap.onesender_api_key || "");
+        setAiModel(settingsMap.ai_model || "");
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error loading settings",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const saveSettings = async () => {
+    setLoading(true);
+    try {
+      const updates = [
+        { key: "onesender_api_url", value: onesenderApiUrl },
+        { key: "onesender_api_key", value: onesenderApiKey },
+        { key: "ai_model", value: aiModel },
+      ];
+
+      for (const update of updates) {
+        const { error } = await supabase
+          .from("settings" as any)
+          .update({ value: update.value, updated_at: new Date().toISOString() } as any)
+          .eq("key", update.key);
+
+        if (error) throw error;
+      }
+
+      toast({
+        title: "Settings saved!",
+        description: "Pengaturan berhasil disimpan.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const changePassword = async () => {
+    if (newPassword !== confirmPassword) {
+      toast({
+        title: "Password tidak cocok",
+        description: "Password baru dan konfirmasi harus sama.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      toast({
+        title: "Password terlalu pendek",
+        description: "Password minimal 6 karakter.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLoadingPassword(true);
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Password berhasil diubah!",
+        description: "Password Anda telah diperbarui.",
+      });
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingPassword(false);
+    }
+  };
+
   return (
     <Layout>
       <div className="space-y-6 animate-fade-in">
@@ -17,29 +152,38 @@ export default function Settings() {
           </p>
         </div>
 
-        {/* Webhook Info */}
+        {/* OneSender API Configuration */}
         <Card className="shadow-card gradient-card">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Webhook className="w-5 h-5" />
-              Webhook Configuration
+              <Zap className="w-5 h-5" />
+              OneSender API Configuration
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div>
-              <p className="text-sm font-medium mb-2">Webhook Endpoint:</p>
-              <div className="rounded-lg bg-muted p-4">
-                <code className="text-xs block overflow-x-auto">
-                  {`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/onesender-webhook`}
-                </code>
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="api-url">API URL</Label>
+              <Input
+                id="api-url"
+                value={onesenderApiUrl}
+                onChange={(e) => setOnesenderApiUrl(e.target.value)}
+                placeholder="http://194.127.192.254:3002/api/v1/messages"
+              />
             </div>
-            <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
-              <p className="text-sm">
-                <strong>Cara menggunakan:</strong> Daftarkan URL webhook di atas ke OneSender dashboard Anda. 
-                Setiap pesan WhatsApp yang masuk akan dikirim ke endpoint ini untuk diproses.
-              </p>
+            <div className="space-y-2">
+              <Label htmlFor="api-key">API Key</Label>
+              <Input
+                id="api-key"
+                type="password"
+                value={onesenderApiKey}
+                onChange={(e) => setOnesenderApiKey(e.target.value)}
+                placeholder="Your OneSender API Key"
+              />
             </div>
+            <Button onClick={saveSettings} disabled={loading} className="w-full">
+              <Save className="w-4 h-4 mr-2" />
+              {loading ? "Menyimpan..." : "Simpan Pengaturan OneSender"}
+            </Button>
           </CardContent>
         </Card>
 
@@ -59,13 +203,22 @@ export default function Settings() {
               </div>
               <Badge className="bg-success">Active</Badge>
             </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium">AI Model</p>
-                <p className="text-sm text-muted-foreground">google/gemini-2.5-flash</p>
-              </div>
-              <Badge variant="outline">Free</Badge>
+            <div className="space-y-2">
+              <Label htmlFor="ai-model">AI Model</Label>
+              <Input
+                id="ai-model"
+                value={aiModel}
+                onChange={(e) => setAiModel(e.target.value)}
+                placeholder="google/gemini-2.5-flash"
+              />
+              <p className="text-xs text-muted-foreground">
+                Model yang tersedia: google/gemini-2.5-flash, google/gemini-2.5-pro
+              </p>
             </div>
+            <Button onClick={saveSettings} disabled={loading} className="w-full">
+              <Save className="w-4 h-4 mr-2" />
+              {loading ? "Menyimpan..." : "Simpan Pengaturan AI"}
+            </Button>
             <div className="rounded-lg border p-4 space-y-2">
               <p className="text-sm font-medium">Fitur AI:</p>
               <ul className="text-sm text-muted-foreground space-y-1">
@@ -78,36 +231,63 @@ export default function Settings() {
           </CardContent>
         </Card>
 
-        {/* OneSender API */}
+        {/* Change Password */}
         <Card className="shadow-card">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Zap className="w-5 h-5" />
-              OneSender API
+              <Key className="w-5 h-5" />
+              Ubah Password
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="new-password">Password Baru</Label>
+              <Input
+                id="new-password"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Masukkan password baru"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirm-password">Konfirmasi Password</Label>
+              <Input
+                id="confirm-password"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Konfirmasi password baru"
+              />
+            </div>
+            <Button onClick={changePassword} disabled={loadingPassword} className="w-full">
+              <Key className="w-4 h-4 mr-2" />
+              {loadingPassword ? "Mengubah..." : "Ubah Password"}
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Webhook Info */}
+        <Card className="shadow-card">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Webhook className="w-5 h-5" />
+              Webhook Configuration
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <p className="font-medium mb-2">API Configuration</p>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">API URL:</span>
-                  <code className="text-xs">api.onesender.id</code>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">API Key:</span>
-                  <Badge variant="outline">Configured</Badge>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Priority:</span>
-                  <span>10 (Default)</span>
-                </div>
+              <p className="text-sm font-medium mb-2">Webhook Endpoint:</p>
+              <div className="rounded-lg bg-muted p-4">
+                <code className="text-xs block overflow-x-auto">
+                  {`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/onesender-webhook`}
+                </code>
               </div>
             </div>
-            <div className="rounded-lg border border-muted p-4">
-              <p className="text-sm text-muted-foreground">
-                API key OneSender telah dikonfigurasi melalui Lovable Cloud secrets. 
-                Semua balasan otomatis akan dikirim melalui OneSender API.
+            <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+              <p className="text-sm">
+                <strong>Cara menggunakan:</strong> Daftarkan URL webhook di atas ke OneSender dashboard Anda. 
+                Setiap pesan WhatsApp yang masuk akan dikirim ke endpoint ini untuk diproses.
               </p>
             </div>
           </CardContent>
