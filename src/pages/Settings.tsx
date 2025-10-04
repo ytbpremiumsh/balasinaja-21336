@@ -26,6 +26,7 @@ export default function Settings() {
   const [onesenderApiUrl, setOnesenderApiUrl] = useState("");
   const [onesenderApiKey, setOnesenderApiKey] = useState("");
   const [aiModel, setAiModel] = useState("");
+  const [systemPrompt, setSystemPrompt] = useState("");
   
   // Password change state
   const [newPassword, setNewPassword] = useState("");
@@ -52,6 +53,7 @@ export default function Settings() {
         setOnesenderApiUrl(settingsMap.onesender_api_url || "");
         setOnesenderApiKey(settingsMap.onesender_api_key || "");
         setAiModel(settingsMap.ai_model || "");
+        setSystemPrompt(settingsMap.system_prompt || "");
       }
     } catch (error: any) {
       toast({
@@ -69,6 +71,7 @@ export default function Settings() {
         { key: "onesender_api_url", value: onesenderApiUrl },
         { key: "onesender_api_key", value: onesenderApiKey },
         { key: "ai_model", value: aiModel },
+        { key: "system_prompt", value: systemPrompt },
       ];
 
       for (const update of updates) {
@@ -215,6 +218,19 @@ export default function Settings() {
                 Model yang tersedia: google/gemini-2.5-flash, google/gemini-2.5-pro
               </p>
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="system-prompt">AI Behavior (System Prompt)</Label>
+              <textarea
+                id="system-prompt"
+                className="w-full min-h-[120px] px-3 py-2 text-sm border rounded-md bg-background"
+                value={systemPrompt}
+                onChange={(e) => setSystemPrompt(e.target.value)}
+                placeholder="Anda adalah asisten AI yang membantu menjawab pertanyaan pelanggan dengan ramah dan profesional."
+              />
+              <p className="text-xs text-muted-foreground">
+                Perilaku AI dalam menjawab pertanyaan. Perubahan akan langsung berlaku untuk balasan berikutnya.
+              </p>
+            </div>
             <Button onClick={saveSettings} disabled={loading} className="w-full">
               <Save className="w-4 h-4 mr-2" />
               {loading ? "Menyimpan..." : "Simpan Pengaturan AI"}
@@ -277,12 +293,15 @@ export default function Settings() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <p className="text-sm font-medium mb-2">Webhook Endpoint:</p>
+              <p className="text-sm font-medium mb-2">Webhook Endpoint (User-Specific):</p>
               <div className="rounded-lg bg-muted p-4">
-                <code className="text-xs block overflow-x-auto">
-                  {`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/onesender-webhook`}
+                <code className="text-xs block overflow-x-auto break-all">
+                  {`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/onesender-webhook?user_id=YOUR_USER_ID`}
                 </code>
               </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Ganti YOUR_USER_ID dengan user ID Anda dari dashboard
+              </p>
             </div>
             <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
               <p className="text-sm">

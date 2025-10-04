@@ -46,11 +46,18 @@ export default function Autoreplies() {
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      toast.error("You must be logged in");
+      return;
+    }
+
     const { error } = await supabase.from("autoreplies").insert({
       trigger: trigger.trim(),
       message_type: messageType,
       content: content.trim(),
       url_image: urlImage.trim() || null,
+      user_id: user.id,
     });
 
     if (error) {

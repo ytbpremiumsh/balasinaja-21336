@@ -20,18 +20,21 @@ export type Database = {
           created_at: string | null
           id: string
           question: string
+          user_id: string | null
         }
         Insert: {
           answer: string
           created_at?: string | null
           id?: string
           question: string
+          user_id?: string | null
         }
         Update: {
           answer?: string
           created_at?: string | null
           id?: string
           question?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -43,6 +46,7 @@ export type Database = {
           message_type: string
           trigger: string
           url_image: string | null
+          user_id: string | null
         }
         Insert: {
           content: string
@@ -51,6 +55,7 @@ export type Database = {
           message_type?: string
           trigger: string
           url_image?: string | null
+          user_id?: string | null
         }
         Update: {
           content?: string
@@ -59,6 +64,7 @@ export type Database = {
           message_type?: string
           trigger?: string
           url_image?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -68,18 +74,21 @@ export type Database = {
           id: string
           name: string | null
           phone: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string | null
           id?: string
           name?: string | null
           phone: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string | null
           id?: string
           name?: string | null
           phone?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -96,6 +105,7 @@ export type Database = {
           reply_message: string | null
           reply_type: string | null
           status: string | null
+          user_id: string | null
         }
         Insert: {
           created_at?: string | null
@@ -109,6 +119,7 @@ export type Database = {
           reply_message?: string | null
           reply_type?: string | null
           status?: string | null
+          user_id?: string | null
         }
         Update: {
           created_at?: string | null
@@ -122,6 +133,55 @@ export type Database = {
           reply_message?: string | null
           reply_type?: string | null
           status?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string | null
+          email: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          email: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          email?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      settings: {
+        Row: {
+          created_at: string | null
+          id: string
+          key: string
+          updated_at: string | null
+          user_id: string | null
+          value: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          key: string
+          updated_at?: string | null
+          user_id?: string | null
+          value: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          key?: string
+          updated_at?: string | null
+          user_id?: string | null
+          value?: string
         }
         Relationships: []
       }

@@ -3,8 +3,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MessageSquare, Inbox, Bot, Users, TrendingUp } from "lucide-react";
 import { Layout } from "@/components/Layout";
+import { User } from "@supabase/supabase-js";
 
 export default function Dashboard() {
+  const [user, setUser] = useState<User | null>(null);
   const [stats, setStats] = useState({
     totalMessages: 0,
     triggeredReplies: 0,
@@ -15,26 +17,40 @@ export default function Dashboard() {
   });
 
   useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+    });
+  }, []);
+
+  useEffect(() => {
     fetchStats();
 
-    // Setup realtime subscription for inbox
-    const channel = supabase
+    // Setup realtime subscriptions for all tables
+    const inboxChannel = supabase
       .channel('dashboard-inbox-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'inbox'
-        },
-        () => {
-          fetchStats();
-        }
-      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'inbox' }, () => fetchStats())
+      .subscribe();
+
+    const contactsChannel = supabase
+      .channel('dashboard-contacts-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'contacts' }, () => fetchStats())
+      .subscribe();
+
+    const triggersChannel = supabase
+      .channel('dashboard-triggers-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'autoreplies' }, () => fetchStats())
+      .subscribe();
+
+    const knowledgeChannel = supabase
+      .channel('dashboard-knowledge-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ai_knowledge_base' }, () => fetchStats())
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(inboxChannel);
+      supabase.removeChannel(contactsChannel);
+      supabase.removeChannel(triggersChannel);
+      supabase.removeChannel(knowledgeChannel);
     };
   }, []);
 
@@ -146,13 +162,13 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="rounded-lg bg-muted p-4">
-              <p className="text-sm font-medium mb-2">Webhook Endpoint:</p>
-              <code className="text-xs bg-background rounded px-3 py-2 block overflow-x-auto">
-                {`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/onesender-webhook`}
+              <p className="text-sm font-medium mb-2">Webhook Endpoint (User-Specific):</p>
+              <code className="text-xs bg-background rounded px-3 py-2 block overflow-x-auto break-all">
+                {`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/onesender-webhook?user_id=${user?.id || 'YOUR_USER_ID'}`}
               </code>
             </div>
             <p className="text-sm text-muted-foreground">
-              Daftarkan URL webhook ini di OneSender dashboard Anda untuk mulai menerima pesan.
+              Daftarkan URL webhook ini di OneSender dashboard Anda. Setiap user memiliki webhook unik.
             </p>
           </CardContent>
         </Card>

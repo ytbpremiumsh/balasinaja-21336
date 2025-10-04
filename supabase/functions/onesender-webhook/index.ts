@@ -17,8 +17,20 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
+    // Get user_id from query params
+    const url = new URL(req.url);
+    const userId = url.searchParams.get('user_id');
+
+    if (!userId) {
+      console.error('❌ No user_id provided');
+      return new Response(JSON.stringify({ error: 'user_id is required' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const payload = await req.json();
-    console.log('🔥 Webhook received:', JSON.stringify(payload, null, 2));
+    console.log('🔥 Webhook received for user:', userId, JSON.stringify(payload, null, 2));
 
     // Validate message
     const isValid = !payload.is_group && 
@@ -42,7 +54,7 @@ serve(async (req) => {
     // Save or update contact
     const { error: contactError } = await supabase
       .from('contacts')
-      .upsert({ phone, name }, { onConflict: 'phone' });
+      .upsert({ phone, name, user_id: userId }, { onConflict: 'phone' });
 
     if (contactError) {
       console.error('Error saving contact:', contactError);
@@ -59,7 +71,8 @@ serve(async (req) => {
         name,
         inbox_type: messageType,
         inbox_message: messageText,
-        status: 'received'
+        status: 'received',
+        user_id: userId
       });
 
     if (inboxError) {
@@ -72,6 +85,7 @@ serve(async (req) => {
     const { data: trigger } = await supabase
       .from('autoreplies')
       .select('*')
+      .eq('user_id', userId)
       .ilike('trigger', messageText.trim())
       .single();
 
@@ -91,7 +105,7 @@ serve(async (req) => {
         .replace('{NAME}', contactName);
 
       // Send reply via OneSender
-      const sent = await sendOneSenderMessage(phone, trigger.message_type, replyContent, trigger.url_image || '');
+      const sent = await sendOneSenderMessage(userId, phone, trigger.message_type, replyContent, trigger.url_image || '');
 
       if (sent) {
         // Update inbox with reply
@@ -116,12 +130,12 @@ serve(async (req) => {
     if (messageType === 'text') {
       console.log('🤖 Attempting AI reply...');
       
-      const aiReply = await generateAiReply(supabase, messageText);
+      const aiReply = await generateAiReply(supabase, userId, messageText);
       
       if (aiReply) {
         console.log('✅ AI generated reply');
         
-        const sent = await sendOneSenderMessage(phone, 'text', aiReply, '');
+        const sent = await sendOneSenderMessage(userId, phone, 'text', aiReply, '');
         
         if (sent) {
           await supabase
@@ -162,21 +176,30 @@ serve(async (req) => {
   }
 });
 
-async function generateAiReply(supabase: any, question: string): Promise<string> {
+async function generateAiReply(supabase: any, userId: string, question: string): Promise<string> {
   try {
-    // Get AI model from settings
-    const { data: aiModelSetting } = await supabase
+    // Get AI model and system prompt from settings
+    const { data: settings } = await supabase
       .from('settings')
-      .select('value')
-      .eq('key', 'ai_model')
-      .single();
+      .select('key, value')
+      .eq('user_id', userId)
+      .in('key', ['ai_model', 'system_prompt']);
 
-    const aiModel = aiModelSetting?.value || 'google/gemini-2.5-flash';
+    let aiModel = 'google/gemini-2.5-flash';
+    let systemPrompt = 'Anda adalah asisten AI yang membantu menjawab pertanyaan pelanggan dengan ramah dan profesional.';
+
+    if (settings) {
+      const modelSetting = settings.find((s: any) => s.key === 'ai_model');
+      const promptSetting = settings.find((s: any) => s.key === 'system_prompt');
+      if (modelSetting) aiModel = modelSetting.value;
+      if (promptSetting) systemPrompt = promptSetting.value;
+    }
 
     // Get knowledge base for context
     const { data: knowledge } = await supabase
       .from('ai_knowledge_base')
       .select('question, answer')
+      .eq('user_id', userId)
       .limit(10);
 
     let context = '';
@@ -185,8 +208,6 @@ async function generateAiReply(supabase: any, question: string): Promise<string>
         .map((k: any) => `Q: ${k.question}\nA: ${k.answer}`)
         .join('\n---\n');
     }
-
-    const systemPrompt = `You are an assistant for a WhatsApp autoresponder named OneSender. Keep replies concise, friendly, and helpful. Answer in the language of the user message (likely Indonesian). Prefer answers suggested in the knowledge base when relevant. Avoid heavy Markdown formatting. If greeting, respond politely.`;
 
     const userPrompt = context 
       ? `${context}\n\nUser question: ${question}`
@@ -224,7 +245,7 @@ async function generateAiReply(supabase: any, question: string): Promise<string>
   }
 }
 
-async function sendOneSenderMessage(to: string, type: string, text: string, image: string): Promise<boolean> {
+async function sendOneSenderMessage(userId: string, to: string, type: string, text: string, image: string): Promise<boolean> {
   try {
     // Create supabase client to access settings
     const supabase = createClient(
@@ -236,6 +257,7 @@ async function sendOneSenderMessage(to: string, type: string, text: string, imag
     const { data: settingsData } = await supabase
       .from('settings')
       .select('key, value')
+      .eq('user_id', userId)
       .in('key', ['onesender_api_url', 'onesender_api_key']);
 
     const settingsMap: any = {};

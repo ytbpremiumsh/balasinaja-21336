@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Bot, Plus, Trash2 } from "lucide-react";
+import { Bot, Plus, Trash2, Edit2, X } from "lucide-react";
 import { toast } from "sonner";
 
 interface Knowledge {
@@ -19,6 +19,7 @@ export default function AIKnowledge() {
   const [knowledge, setKnowledge] = useState<Knowledge[]>([]);
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchKnowledge();
@@ -37,22 +38,60 @@ export default function AIKnowledge() {
     }
   };
 
-  const handleAdd = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const { error } = await supabase.from("ai_knowledge_base").insert({
-      question: question.trim(),
-      answer: answer.trim(),
-    });
+    if (editingId) {
+      // Update existing knowledge
+      const { error } = await supabase
+        .from("ai_knowledge_base")
+        .update({
+          question: question.trim(),
+          answer: answer.trim(),
+        })
+        .eq("id", editingId);
 
-    if (error) {
-      toast.error("Gagal menambah knowledge: " + error.message);
+      if (error) {
+        toast.error("Gagal mengupdate knowledge: " + error.message);
+      } else {
+        toast.success("Knowledge berhasil diupdate!");
+        resetForm();
+        fetchKnowledge();
+      }
     } else {
-      toast.success("Knowledge berhasil ditambahkan!");
-      setQuestion("");
-      setAnswer("");
-      fetchKnowledge();
+      // Insert new knowledge
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error("You must be logged in");
+        return;
+      }
+
+      const { error } = await supabase.from("ai_knowledge_base").insert({
+        question: question.trim(),
+        answer: answer.trim(),
+        user_id: user.id,
+      });
+
+      if (error) {
+        toast.error("Gagal menambah knowledge: " + error.message);
+      } else {
+        toast.success("Knowledge berhasil ditambahkan!");
+        resetForm();
+        fetchKnowledge();
+      }
     }
+  };
+
+  const handleEdit = (kb: Knowledge) => {
+    setEditingId(kb.id);
+    setQuestion(kb.question);
+    setAnswer(kb.answer);
+  };
+
+  const resetForm = () => {
+    setEditingId(null);
+    setQuestion("");
+    setAnswer("");
   };
 
   const handleDelete = async (id: string) => {
@@ -81,16 +120,24 @@ export default function AIKnowledge() {
           </p>
         </div>
 
-        {/* Add Form */}
+        {/* Add/Edit Form */}
         <Card className="shadow-card gradient-card">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Plus className="w-5 h-5" />
-              Tambah Knowledge Baru
+            <CardTitle className="flex items-center gap-2 justify-between">
+              <div className="flex items-center gap-2">
+                {editingId ? <Edit2 className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
+                {editingId ? "Edit Knowledge" : "Tambah Knowledge Baru"}
+              </div>
+              {editingId && (
+                <Button variant="ghost" size="sm" onClick={resetForm}>
+                  <X className="w-4 h-4 mr-1" />
+                  Cancel
+                </Button>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleAdd} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <Label htmlFor="question">Pertanyaan</Label>
                 <Textarea
@@ -114,8 +161,17 @@ export default function AIKnowledge() {
                 />
               </div>
               <Button type="submit" className="w-full">
-                <Plus className="w-4 h-4 mr-2" />
-                Simpan Knowledge
+                {editingId ? (
+                  <>
+                    <Edit2 className="w-4 h-4 mr-2" />
+                    Update Knowledge
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Simpan Knowledge
+                  </>
+                )}
               </Button>
             </form>
           </CardContent>
@@ -153,14 +209,24 @@ export default function AIKnowledge() {
                           <p className="text-sm text-muted-foreground">{kb.answer}</p>
                         </div>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDelete(kb.id)}
-                        className="text-destructive hover:text-destructive hover:bg-destructive/10 flex-shrink-0"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                      <div className="flex gap-2 flex-shrink-0">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleEdit(kb)}
+                          className="text-primary hover:text-primary hover:bg-primary/10"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDelete(kb.id)}
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 ))
