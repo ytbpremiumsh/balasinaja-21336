@@ -178,21 +178,28 @@ serve(async (req) => {
 
 async function generateAiReply(supabase: any, userId: string, question: string): Promise<string> {
   try {
-    // Get AI model and system prompt from settings
+    // Get AI settings from database
     const { data: settings } = await supabase
       .from('settings')
       .select('key, value')
       .eq('user_id', userId)
-      .in('key', ['ai_model', 'system_prompt']);
+      .in('key', ['ai_vendor', 'ai_api_key', 'ai_model', 'system_prompt']);
 
+    let aiVendor = 'lovable';
+    let aiApiKey = '';
     let aiModel = 'google/gemini-2.5-flash';
     let systemPrompt = 'Anda adalah asisten AI yang membantu menjawab pertanyaan pelanggan dengan ramah dan profesional.';
 
     if (settings) {
+      const vendorSetting = settings.find((s: any) => s.key === 'ai_vendor');
+      const keySetting = settings.find((s: any) => s.key === 'ai_api_key');
       const modelSetting = settings.find((s: any) => s.key === 'ai_model');
       const promptSetting = settings.find((s: any) => s.key === 'system_prompt');
-      if (modelSetting) aiModel = modelSetting.value;
-      if (promptSetting) systemPrompt = promptSetting.value;
+      
+      if (vendorSetting) aiVendor = vendorSetting.value;
+      if (keySetting) aiApiKey = keySetting.value;
+      if (modelSetting && modelSetting.value) aiModel = modelSetting.value;
+      if (promptSetting && promptSetting.value) systemPrompt = promptSetting.value;
     }
 
     // Get knowledge base for context
@@ -210,34 +217,97 @@ async function generateAiReply(supabase: any, userId: string, question: string):
     }
 
     const userPrompt = context 
-      ? `${context}\n\nUser question: ${question}`
+      ? `Gunakan konteks berikut untuk menjawab pertanyaan:\n\n${context}\n\nPertanyaan: ${question}`
       : question;
 
-    // Call Lovable AI
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${Deno.env.get('LOVABLE_API_KEY')}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: aiModel,
+    let apiUrl = '';
+    let apiKey = '';
+    let requestBody: any = {};
+
+    // Configure based on AI vendor
+    if (aiVendor === 'lovable') {
+      apiUrl = 'https://ai.gateway.lovable.dev/v1/chat/completions';
+      apiKey = Deno.env.get('LOVABLE_API_KEY') || '';
+      requestBody = {
+        model: aiModel || 'google/gemini-2.5-flash',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
-        temperature: 0.7,
         max_tokens: 512,
-      }),
+      };
+    } else if (aiVendor === 'gemini') {
+      apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${aiModel || 'gemini-2.5-flash-latest'}:generateContent?key=${aiApiKey}`;
+      requestBody = {
+        contents: [{
+          parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }]
+        }],
+        generationConfig: {
+          maxOutputTokens: 512,
+          temperature: 0.7,
+        }
+      };
+    } else if (aiVendor === 'openai') {
+      apiUrl = 'https://api.openai.com/v1/chat/completions';
+      apiKey = aiApiKey;
+      requestBody = {
+        model: aiModel || 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        max_tokens: 512,
+        temperature: 0.7,
+      };
+    } else if (aiVendor === 'openrouter') {
+      apiUrl = 'https://openrouter.ai/api/v1/chat/completions';
+      apiKey = aiApiKey;
+      requestBody = {
+        model: aiModel || 'auto',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        max_tokens: 512,
+      };
+    }
+
+    if (!apiKey && aiVendor !== 'gemini') {
+      console.error(`AI API key not configured for ${aiVendor}`);
+      return '';
+    }
+
+    const headers: any = {
+      'Content-Type': 'application/json',
+    };
+
+    if (aiVendor !== 'gemini') {
+      headers['Authorization'] = `Bearer ${apiKey}`;
+    }
+
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
-      console.error('AI API error:', response.status);
+      const errorText = await response.text();
+      console.error(`AI API error (${aiVendor}):`, response.status, errorText);
       return '';
     }
 
     const data = await response.json();
-    return data.choices?.[0]?.message?.content?.trim() || '';
+    
+    // Parse response based on vendor
+    let reply = '';
+    if (aiVendor === 'gemini') {
+      reply = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    } else {
+      reply = data.choices?.[0]?.message?.content || '';
+    }
+
+    return reply.trim();
 
   } catch (error) {
     console.error('Error generating AI reply:', error);

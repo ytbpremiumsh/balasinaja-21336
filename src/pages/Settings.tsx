@@ -25,6 +25,8 @@ export default function Settings() {
   // Settings state
   const [onesenderApiUrl, setOnesenderApiUrl] = useState("");
   const [onesenderApiKey, setOnesenderApiKey] = useState("");
+  const [aiVendor, setAiVendor] = useState("lovable");
+  const [aiApiKey, setAiApiKey] = useState("");
   const [aiModel, setAiModel] = useState("");
   const [systemPrompt, setSystemPrompt] = useState("");
   
@@ -52,6 +54,8 @@ export default function Settings() {
 
         setOnesenderApiUrl(settingsMap.onesender_api_url || "");
         setOnesenderApiKey(settingsMap.onesender_api_key || "");
+        setAiVendor(settingsMap.ai_vendor || "lovable");
+        setAiApiKey(settingsMap.ai_api_key || "");
         setAiModel(settingsMap.ai_model || "");
         setSystemPrompt(settingsMap.system_prompt || "");
       }
@@ -67,9 +71,14 @@ export default function Settings() {
   const saveSettings = async () => {
     setLoading(true);
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
       const updates = [
         { key: "onesender_api_url", value: onesenderApiUrl },
         { key: "onesender_api_key", value: onesenderApiKey },
+        { key: "ai_vendor", value: aiVendor },
+        { key: "ai_api_key", value: aiApiKey },
         { key: "ai_model", value: aiModel },
         { key: "system_prompt", value: systemPrompt },
       ];
@@ -77,8 +86,15 @@ export default function Settings() {
       for (const update of updates) {
         const { error } = await supabase
           .from("settings" as any)
-          .update({ value: update.value, updated_at: new Date().toISOString() } as any)
-          .eq("key", update.key);
+          .upsert(
+            { 
+              user_id: user.id, 
+              key: update.key, 
+              value: update.value, 
+              updated_at: new Date().toISOString() 
+            } as any,
+            { onConflict: 'user_id,key' }
+          );
 
         if (error) throw error;
       }
@@ -199,25 +215,55 @@ export default function Settings() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium">AI Provider</p>
-                <p className="text-sm text-muted-foreground">Lovable AI Gateway</p>
-              </div>
-              <Badge className="bg-success">Active</Badge>
+            <div className="space-y-2">
+              <Label htmlFor="ai-vendor">AI Provider</Label>
+              <select
+                id="ai-vendor"
+                className="w-full px-3 py-2 text-sm border rounded-md bg-background"
+                value={aiVendor}
+                onChange={(e) => setAiVendor(e.target.value)}
+              >
+                <option value="lovable">Lovable AI (Free - Gemini & GPT-5)</option>
+                <option value="gemini">Google Gemini</option>
+                <option value="openai">OpenAI</option>
+                <option value="openrouter">OpenRouter</option>
+              </select>
             </div>
+
+            {aiVendor !== 'lovable' && (
+              <div className="space-y-2">
+                <Label htmlFor="ai-api-key">AI API Key</Label>
+                <Input
+                  id="ai-api-key"
+                  type="password"
+                  value={aiApiKey}
+                  onChange={(e) => setAiApiKey(e.target.value)}
+                  placeholder="Your AI API Key"
+                />
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="ai-model">AI Model</Label>
               <Input
                 id="ai-model"
                 value={aiModel}
                 onChange={(e) => setAiModel(e.target.value)}
-                placeholder="google/gemini-2.5-flash"
+                placeholder={
+                  aiVendor === 'lovable' ? 'google/gemini-2.5-flash' :
+                  aiVendor === 'gemini' ? 'gemini-2.5-flash' :
+                  aiVendor === 'openai' ? 'gpt-4o-mini' :
+                  'auto'
+                }
               />
               <p className="text-xs text-muted-foreground">
-                Model yang tersedia: google/gemini-2.5-flash, google/gemini-2.5-pro
+                {aiVendor === 'lovable' && 'Model: google/gemini-2.5-flash, google/gemini-2.5-pro, openai/gpt-5, openai/gpt-5-mini'}
+                {aiVendor === 'gemini' && 'Model: gemini-2.5-flash, gemini-2.5-pro'}
+                {aiVendor === 'openai' && 'Model: gpt-4o, gpt-4o-mini, gpt-4-turbo'}
+                {aiVendor === 'openrouter' && 'Model: auto atau model spesifik dari OpenRouter'}
               </p>
             </div>
+
             <div className="space-y-2">
               <Label htmlFor="system-prompt">AI Behavior (System Prompt)</Label>
               <textarea
@@ -231,17 +277,19 @@ export default function Settings() {
                 Perilaku AI dalam menjawab pertanyaan. Perubahan akan langsung berlaku untuk balasan berikutnya.
               </p>
             </div>
+
             <Button onClick={saveSettings} disabled={loading} className="w-full">
               <Save className="w-4 h-4 mr-2" />
               {loading ? "Menyimpan..." : "Simpan Pengaturan AI"}
             </Button>
+
             <div className="rounded-lg border p-4 space-y-2">
               <p className="text-sm font-medium">Fitur AI:</p>
               <ul className="text-sm text-muted-foreground space-y-1">
                 <li>✓ Balasan otomatis cerdas ketika tidak ada trigger match</li>
                 <li>✓ Menggunakan Knowledge Base sebagai konteks</li>
                 <li>✓ Respons dalam bahasa Indonesia</li>
-                <li>✓ Gratis menggunakan Lovable AI (Gemini models)</li>
+                <li>✓ {aiVendor === 'lovable' ? 'Gratis menggunakan Lovable AI' : `Custom ${aiVendor} integration`}</li>
               </ul>
             </div>
           </CardContent>
