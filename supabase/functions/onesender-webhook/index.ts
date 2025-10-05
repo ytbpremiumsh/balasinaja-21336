@@ -54,7 +54,7 @@ serve(async (req) => {
     // Save or update contact
     const { error: contactError } = await supabase
       .from('contacts')
-      .upsert({ phone, name, user_id: userId }, { onConflict: 'phone' });
+      .upsert({ phone, name, user_id: userId }, { onConflict: 'phone,user_id' });
 
     if (contactError) {
       console.error('Error saving contact:', contactError);
@@ -97,6 +97,7 @@ serve(async (req) => {
         .from('contacts')
         .select('name')
         .eq('phone', phone)
+        .eq('user_id', userId)
         .single();
 
       const contactName = contact?.name || name;
@@ -105,7 +106,7 @@ serve(async (req) => {
         .replace('{NAME}', contactName);
 
       // Send reply via OneSender
-      const sent = await sendOneSenderMessage(userId, phone, trigger.message_type, replyContent, trigger.url_image || '');
+      const sent = await sendOneSenderMessage(supabase, userId, phone, trigger.message_type, replyContent, trigger.url_image || '');
 
       if (sent) {
         // Update inbox with reply
@@ -117,7 +118,8 @@ serve(async (req) => {
             reply_image: trigger.url_image || '',
             status: 'replied_trigger'
           })
-          .eq('message_id', messageId);
+          .eq('message_id', messageId)
+          .eq('user_id', userId);
 
         console.log('📣 Reply sent via trigger');
         return new Response(JSON.stringify({ status: 'replied_trigger' }), {
@@ -135,7 +137,7 @@ serve(async (req) => {
       if (aiReply) {
         console.log('✅ AI generated reply');
         
-        const sent = await sendOneSenderMessage(userId, phone, 'text', aiReply, '');
+        const sent = await sendOneSenderMessage(supabase, userId, phone, 'text', aiReply, '');
         
         if (sent) {
           await supabase
@@ -145,7 +147,8 @@ serve(async (req) => {
               reply_message: aiReply,
               status: 'replied_ai'
             })
-            .eq('message_id', messageId);
+            .eq('message_id', messageId)
+            .eq('user_id', userId);
 
           console.log('🤖 AI reply sent');
           return new Response(JSON.stringify({ status: 'replied_ai' }), {
@@ -160,7 +163,8 @@ serve(async (req) => {
     await supabase
       .from('inbox')
       .update({ status: 'no_reply' })
-      .eq('message_id', messageId);
+      .eq('message_id', messageId)
+      .eq('user_id', userId);
 
     return new Response(JSON.stringify({ status: 'no_reply' }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -178,7 +182,7 @@ serve(async (req) => {
 
 async function generateAiReply(supabase: any, userId: string, question: string): Promise<string> {
   try {
-    // Get AI settings from database
+    // Get AI settings
     const { data: settings } = await supabase
       .from('settings')
       .select('key, value')
@@ -196,11 +200,13 @@ async function generateAiReply(supabase: any, userId: string, question: string):
       const modelSetting = settings.find((s: any) => s.key === 'ai_model');
       const promptSetting = settings.find((s: any) => s.key === 'system_prompt');
       
-      if (vendorSetting) aiVendor = vendorSetting.value;
+      if (vendorSetting && vendorSetting.value) aiVendor = vendorSetting.value;
       if (keySetting) aiApiKey = keySetting.value;
       if (modelSetting && modelSetting.value) aiModel = modelSetting.value;
       if (promptSetting && promptSetting.value) systemPrompt = promptSetting.value;
     }
+
+    console.log('🤖 Using AI vendor:', aiVendor, 'model:', aiModel);
 
     // Get knowledge base for context
     const { data: knowledge } = await supabase
@@ -217,7 +223,7 @@ async function generateAiReply(supabase: any, userId: string, question: string):
     }
 
     const userPrompt = context 
-      ? `Gunakan konteks berikut untuk menjawab pertanyaan:\n\n${context}\n\nPertanyaan: ${question}`
+      ? `Gunakan knowledge base berikut untuk menjawab:\n\n${context}\n\nPertanyaan: ${question}`
       : question;
 
     let apiUrl = '';
@@ -229,7 +235,7 @@ async function generateAiReply(supabase: any, userId: string, question: string):
       apiUrl = 'https://ai.gateway.lovable.dev/v1/chat/completions';
       apiKey = Deno.env.get('LOVABLE_API_KEY') || '';
       requestBody = {
-        model: aiModel || 'google/gemini-2.5-flash',
+        model: aiModel,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
@@ -237,7 +243,8 @@ async function generateAiReply(supabase: any, userId: string, question: string):
         max_tokens: 512,
       };
     } else if (aiVendor === 'gemini') {
-      apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${aiModel || 'gemini-2.5-flash-latest'}:generateContent?key=${aiApiKey}`;
+      apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${aiModel}:generateContent`;
+      apiKey = aiApiKey;
       requestBody = {
         contents: [{
           parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }]
@@ -251,7 +258,7 @@ async function generateAiReply(supabase: any, userId: string, question: string):
       apiUrl = 'https://api.openai.com/v1/chat/completions';
       apiKey = aiApiKey;
       requestBody = {
-        model: aiModel || 'gpt-4o-mini',
+        model: aiModel,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
@@ -263,17 +270,18 @@ async function generateAiReply(supabase: any, userId: string, question: string):
       apiUrl = 'https://openrouter.ai/api/v1/chat/completions';
       apiKey = aiApiKey;
       requestBody = {
-        model: aiModel || 'auto',
+        model: aiModel,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
         max_tokens: 512,
+        temperature: 0.7,
       };
     }
 
-    if (!apiKey && aiVendor !== 'gemini') {
-      console.error(`AI API key not configured for ${aiVendor}`);
+    if (!apiKey) {
+      console.error('❌ AI API key not configured for vendor:', aiVendor);
       return '';
     }
 
@@ -281,9 +289,14 @@ async function generateAiReply(supabase: any, userId: string, question: string):
       'Content-Type': 'application/json',
     };
 
-    if (aiVendor !== 'gemini') {
+    // Gemini uses API key as query param
+    if (aiVendor === 'gemini') {
+      apiUrl += `?key=${apiKey}`;
+    } else {
       headers['Authorization'] = `Bearer ${apiKey}`;
     }
+
+    console.log('🌐 Calling AI API:', apiUrl);
 
     const response = await fetch(apiUrl, {
       method: 'POST',
@@ -293,36 +306,27 @@ async function generateAiReply(supabase: any, userId: string, question: string):
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`AI API error (${aiVendor}):`, response.status, errorText);
+      console.error('❌ AI API error:', response.status, errorText);
       return '';
     }
 
     const data = await response.json();
-    
-    // Parse response based on vendor
-    let reply = '';
+
+    // Extract response based on vendor
     if (aiVendor === 'gemini') {
-      reply = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
     } else {
-      reply = data.choices?.[0]?.message?.content || '';
+      return data.choices?.[0]?.message?.content?.trim() || '';
     }
 
-    return reply.trim();
-
   } catch (error) {
-    console.error('Error generating AI reply:', error);
+    console.error('❌ Error generating AI reply:', error);
     return '';
   }
 }
 
-async function sendOneSenderMessage(userId: string, to: string, type: string, text: string, image: string): Promise<boolean> {
+async function sendOneSenderMessage(supabase: any, userId: string, to: string, type: string, text: string, image: string): Promise<boolean> {
   try {
-    // Create supabase client to access settings
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-
     // Get API URL and Key from database settings
     const { data: settingsData } = await supabase
       .from('settings')
@@ -337,13 +341,15 @@ async function sendOneSenderMessage(userId: string, to: string, type: string, te
       });
     }
 
-    const apiUrl = settingsMap.onesender_api_url || 'http://194.127.192.254:3002/api/v1/messages';
-    const apiKey = settingsMap.onesender_api_key || Deno.env.get('ONESENDER_API_KEY');
+    const apiUrl = settingsMap.onesender_api_url || '';
+    const apiKey = settingsMap.onesender_api_key || '';
 
-    if (!apiKey) {
-      console.error('OneSender API key not configured');
+    if (!apiUrl || !apiKey) {
+      console.error('❌ OneSender API URL or key not configured');
       return false;
     }
+
+    console.log('📤 Sending to OneSender:', apiUrl);
 
     const payload: any = {
       to,
@@ -369,15 +375,16 @@ async function sendOneSenderMessage(userId: string, to: string, type: string, te
     });
 
     if (response.ok) {
-      console.log('📤 Message sent to OneSender');
+      console.log('✅ Message sent to OneSender');
       return true;
     } else {
-      console.error('OneSender API error:', await response.text());
+      const errorText = await response.text();
+      console.error('❌ OneSender API error:', errorText);
       return false;
     }
 
   } catch (error) {
-    console.error('Error sending to OneSender:', error);
+    console.error('❌ Error sending to OneSender:', error);
     return false;
   }
 }
