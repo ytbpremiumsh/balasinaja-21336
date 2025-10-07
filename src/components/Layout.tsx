@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { MessageSquare, Inbox, Bot, Users, Settings, Sparkles, LogOut } from "lucide-react";
+import { MessageSquare, Inbox, Bot, Users, Settings, Sparkles, LogOut, Brain } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ const navigation = [
   { name: "Inbox", href: "/inbox", icon: Inbox },
   { name: "Autoreplies", href: "/autoreplies", icon: MessageSquare },
   { name: "AI Knowledge", href: "/ai-knowledge", icon: Bot },
+  { name: "AI Behavior", href: "/ai-behavior", icon: Brain },
   { name: "Contacts", href: "/contacts", icon: Users },
 ];
 

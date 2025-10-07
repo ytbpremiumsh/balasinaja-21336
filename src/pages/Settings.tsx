@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Settings as SettingsIcon, Webhook, Bot, Zap, Save, Key } from "lucide-react";
@@ -265,7 +266,7 @@ export default function Settings() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="system-prompt">AI Behavior (System Prompt)</Label>
+              <Label htmlFor="system-prompt">System Prompt (AI Behavior)</Label>
               <textarea
                 id="system-prompt"
                 className="w-full min-h-[120px] px-3 py-2 text-sm border rounded-md bg-background"
@@ -274,7 +275,8 @@ export default function Settings() {
                 placeholder="Anda adalah asisten AI yang membantu menjawab pertanyaan pelanggan dengan ramah dan profesional."
               />
               <p className="text-xs text-muted-foreground">
-                Perilaku AI dalam menjawab pertanyaan. Perubahan akan langsung berlaku untuk balasan berikutnya.
+                Tentukan perilaku dan karakter AI dalam menjawab pertanyaan pelanggan. 
+                Untuk melihat transparansi lengkap AI, kunjungi halaman <Link to="/ai-behavior" className="text-primary hover:underline">AI Behavior</Link>.
               </p>
             </div>
 

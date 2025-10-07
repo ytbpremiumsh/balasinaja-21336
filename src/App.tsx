@@ -7,6 +7,7 @@ import Dashboard from "./pages/Dashboard";
 import Inbox from "./pages/Inbox";
 import Autoreplies from "./pages/Autoreplies";
 import AIKnowledge from "./pages/AIKnowledge";
+import AIBehavior from "./pages/AIBehavior";
 import Contacts from "./pages/Contacts";
 import Settings from "./pages/Settings";
 import Auth from "./pages/Auth";
@@ -27,6 +28,7 @@ const App = () => (
           <Route path="/inbox" element={<ProtectedRoute><Inbox /></ProtectedRoute>} />
           <Route path="/autoreplies" element={<ProtectedRoute><Autoreplies /></ProtectedRoute>} />
           <Route path="/ai-knowledge" element={<ProtectedRoute><AIKnowledge /></ProtectedRoute>} />
+          <Route path="/ai-behavior" element={<ProtectedRoute><AIBehavior /></ProtectedRoute>} />
           <Route path="/contacts" element={<ProtectedRoute><Contacts /></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
