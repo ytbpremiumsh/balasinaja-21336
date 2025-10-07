@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { MessageSquare, Inbox, Bot, Users, TrendingUp } from "lucide-react";
+import { MessageSquare, Inbox, Bot, Users, TrendingUp, BarChart3 } from "lucide-react";
 import { Layout } from "@/components/Layout";
 import { User } from "@supabase/supabase-js";
 
@@ -14,6 +14,7 @@ export default function Dashboard() {
     totalContacts: 0,
     totalTriggers: 0,
     totalKnowledge: 0,
+    responseRate: 0,
   });
 
   useEffect(() => {
@@ -24,6 +25,11 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchStats();
+
+    // Auto-refresh every 5 seconds
+    const refreshInterval = setInterval(() => {
+      fetchStats();
+    }, 5000);
 
     // Setup realtime subscriptions for all tables
     const inboxChannel = supabase
@@ -47,6 +53,7 @@ export default function Dashboard() {
       .subscribe();
 
     return () => {
+      clearInterval(refreshInterval);
       supabase.removeChannel(inboxChannel);
       supabase.removeChannel(contactsChannel);
       supabase.removeChannel(triggersChannel);
@@ -66,6 +73,9 @@ export default function Dashboard() {
       inbox.data?.filter((m) => m.status === "replied_trigger").length || 0;
     const aiReplies =
       inbox.data?.filter((m) => m.status === "replied_ai").length || 0;
+    
+    const totalReplies = triggeredReplies + aiReplies;
+    const responseRate = inbox.count ? Math.round((totalReplies / inbox.count) * 100) : 0;
 
     setStats({
       totalMessages: inbox.count || 0,
@@ -74,6 +84,7 @@ export default function Dashboard() {
       totalContacts: contacts.count || 0,
       totalTriggers: triggers.count || 0,
       totalKnowledge: knowledge.count || 0,
+      responseRate,
     });
   };
 
@@ -119,6 +130,13 @@ export default function Dashboard() {
       icon: Bot,
       description: "Data AI tersimpan",
       gradient: "from-pink-500 to-pink-600",
+    },
+    {
+      title: "Response Rate",
+      value: `${stats.responseRate}%`,
+      icon: BarChart3,
+      description: "Tingkat balasan pesan",
+      gradient: "from-cyan-500 to-cyan-600",
     },
   ];
 

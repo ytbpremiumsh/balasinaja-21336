@@ -10,6 +10,8 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { User } from "@supabase/supabase-js";
+import { Copy, Check } from "lucide-react";
 
 interface SettingRow {
   id: string;
@@ -23,6 +25,8 @@ export default function Settings() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [loadingPassword, setLoadingPassword] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [copied, setCopied] = useState(false);
   
   // Settings state
   const [onesenderApiUrl, setOnesenderApiUrl] = useState("");
@@ -38,6 +42,9 @@ export default function Settings() {
 
   useEffect(() => {
     loadSettings();
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+    });
   }, []);
 
   const loadSettings = async () => {
@@ -188,7 +195,7 @@ export default function Settings() {
                 id="api-url"
                 value={onesenderApiUrl}
                 onChange={(e) => setOnesenderApiUrl(e.target.value)}
-                placeholder="http://194.127.192.254:3002/api/v1/messages"
+                placeholder="http://domainmu.com/api/v1/messages"
               />
             </div>
             <div className="space-y-2">
@@ -344,15 +351,30 @@ export default function Settings() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <p className="text-sm font-medium mb-2">Webhook Endpoint (User-Specific):</p>
-              <div className="rounded-lg bg-muted p-4">
-                <code className="text-xs block overflow-x-auto break-all">
-                  {`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/onesender-webhook?user_id=YOUR_USER_ID`}
+              <p className="text-sm font-medium mb-2">Webhook Endpoint:</p>
+              <div className="rounded-lg bg-muted p-4 relative">
+                <code className="text-xs block overflow-x-auto break-all pr-10">
+                  {`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/onesender-webhook?user_id=${user?.id || 'loading...'}`}
                 </code>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="absolute top-2 right-2"
+                  onClick={() => {
+                    navigator.clipboard.writeText(
+                      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/onesender-webhook?user_id=${user?.id}`
+                    );
+                    setCopied(true);
+                    toast({
+                      title: "Copied!",
+                      description: "Webhook URL berhasil disalin ke clipboard.",
+                    });
+                    setTimeout(() => setCopied(false), 2000);
+                  }}
+                >
+                  {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                </Button>
               </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                Ganti YOUR_USER_ID dengan user ID Anda dari dashboard
-              </p>
             </div>
             <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
               <p className="text-sm">
