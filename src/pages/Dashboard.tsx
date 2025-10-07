@@ -131,13 +131,6 @@ export default function Dashboard() {
       description: "Data AI tersimpan",
       gradient: "from-pink-500 to-pink-600",
     },
-    {
-      title: "Response Rate",
-      value: `${stats.responseRate}%`,
-      icon: BarChart3,
-      description: "Tingkat balasan pesan",
-      gradient: "from-cyan-500 to-cyan-600",
-    },
   ];
 
   return (
@@ -149,6 +142,29 @@ export default function Dashboard() {
             Statistik dan overview sistem autoreply WhatsApp
           </p>
         </div>
+
+        {/* Response Rate Card - Full Width */}
+        <Card className="gradient-card shadow-card border-0 bg-gradient-to-br from-cyan-500/10 via-blue-500/10 to-purple-500/10">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="rounded-xl p-4 bg-gradient-to-br from-cyan-500 to-blue-600">
+                  <BarChart3 className="h-8 w-8 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Response Rate</p>
+                  <p className="text-5xl font-bold mt-1">{stats.responseRate}%</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-sm text-muted-foreground">Tingkat balasan pesan</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {stats.triggeredReplies + stats.aiReplies} dari {stats.totalMessages} pesan dibalas
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {statCards.map((stat) => (
