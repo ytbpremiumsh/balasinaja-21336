@@ -185,7 +185,7 @@ export default function Settings() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Zap className="w-5 h-5" />
-              OneSender API Configuration
+              Konfigurasi API OneSender
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -220,7 +220,7 @@ export default function Settings() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Bot className="w-5 h-5" />
-              AI Configuration
+              Konfigurasi AI
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -346,7 +346,7 @@ export default function Settings() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Webhook className="w-5 h-5" />
-              Webhook Configuration
+              Konfigurasi Webhook
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -388,7 +388,7 @@ export default function Settings() {
         {/* System Info */}
         <Card className="shadow-card">
           <CardHeader>
-            <CardTitle>System Information</CardTitle>
+            <CardTitle>Informasi Sistem</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid gap-3 text-sm">

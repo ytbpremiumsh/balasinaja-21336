@@ -84,11 +84,11 @@ export default function Auth() {
             <Lock className="w-6 h-6 text-primary" />
           </div>
           <CardTitle className="text-2xl">
-            {isSignUp ? "Buat Akun Baru" : "Login ke Dashboard"}
+            {isSignUp ? "Buat Akun Baru" : "Login ke BalasinAja"}
           </CardTitle>
           <CardDescription>
             {isSignUp 
-              ? "Daftar untuk mengakses OneSender Dashboard" 
+              ? "Daftar untuk mengakses BalasinAja Dashboard" 
               : "Masukkan kredensial Anda untuk melanjutkan"
             }
           </CardDescription>

@@ -1,11 +1,12 @@
+import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { MessageSquare, Inbox, Bot, Users, Settings, Sparkles, LogOut, Brain } from "lucide-react";
+import { MessageSquare, Inbox, Bot, Users, Settings, Sparkles, LogOut, Brain, Shield, UserCog, Package, ScrollText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
-const navigation = [
+const userNavigation = [
   { name: "Dashboard", href: "/", icon: Sparkles },
   { name: "Inbox", href: "/inbox", icon: Inbox },
   { name: "Autoreplies", href: "/autoreplies", icon: MessageSquare },
@@ -14,9 +15,48 @@ const navigation = [
   { name: "Contacts", href: "/contacts", icon: Users },
 ];
 
+const adminNavigation = [
+  { name: "Dashboard Admin", href: "/admin", icon: Shield },
+  { name: "Manajemen User", href: "/admin/users", icon: UserCog },
+  { name: "Manajemen Paket", href: "/admin/packages", icon: Package },
+  { name: "Log Aktivitas", href: "/admin/logs", icon: ScrollText },
+];
+
 export const Layout = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
   const navigate = useNavigate();
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [navigation, setNavigation] = useState(userNavigation);
+
+  useEffect(() => {
+    const checkAdminRole = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+
+        const { data: roles } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', session.user.id)
+          .eq('role', 'admin')
+          .maybeSingle();
+
+        const hasAdminRole = !!roles;
+        setIsAdmin(hasAdminRole);
+        
+        // Set navigation based on role
+        if (hasAdminRole) {
+          setNavigation([...adminNavigation, ...userNavigation]);
+        } else {
+          setNavigation(userNavigation);
+        }
+      } catch (error) {
+        console.error('Error checking admin role:', error);
+      }
+    };
+
+    checkAdminRole();
+  }, []);
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
@@ -38,7 +78,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
               <MessageSquare className="w-6 h-6 text-primary-foreground" />
             </div>
             <span className="bg-gradient-to-r from-primary to-primary-glow bg-clip-text text-transparent">
-              OneSender Dashboard
+              BalasinAja {isAdmin && <span className="text-sm text-muted-foreground">(Admin)</span>}
             </span>
           </Link>
           
@@ -102,7 +142,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
       {/* Footer */}
       <footer className="border-t border-border bg-card py-6 mt-12">
         <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
-          OneSender Dashboard © 2025 - WhatsApp Autoreply System
+          BalasinAja Dashboard © {new Date().getFullYear()} - WhatsApp AI Autoreply System
         </div>
       </footer>
     </div>

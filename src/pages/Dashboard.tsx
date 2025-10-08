@@ -139,7 +139,7 @@ export default function Dashboard() {
         <div>
           <h1 className="text-4xl font-bold">Dashboard</h1>
           <p className="text-muted-foreground mt-2">
-            Statistik dan overview sistem autoreply WhatsApp
+            Selamat datang di BalasinAja - Sistem autoreply WhatsApp AI
           </p>
         </div>
 

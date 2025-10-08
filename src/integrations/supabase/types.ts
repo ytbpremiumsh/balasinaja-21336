@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      activity_logs: {
+        Row: {
+          action: string
+          admin_id: string | null
+          created_at: string | null
+          details: string | null
+          id: string
+          target_user_id: string | null
+        }
+        Insert: {
+          action: string
+          admin_id?: string | null
+          created_at?: string | null
+          details?: string | null
+          id?: string
+          target_user_id?: string | null
+        }
+        Update: {
+          action?: string
+          admin_id?: string | null
+          created_at?: string | null
+          details?: string | null
+          id?: string
+          target_user_id?: string | null
+        }
+        Relationships: []
+      }
       ai_knowledge_base: {
         Row: {
           answer: string
@@ -137,24 +164,72 @@ export type Database = {
         }
         Relationships: []
       }
+      packages: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          duration_days: number
+          id: string
+          is_active: boolean | null
+          name: string
+          price: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          duration_days: number
+          id?: string
+          is_active?: boolean | null
+          name: string
+          price?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          duration_days?: number
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          price?: number | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string | null
           email: string
+          expire_at: string | null
           id: string
+          name: string | null
+          phone: string | null
+          plan: string | null
+          status: string | null
           user_id: string
+          whatsapp_number: string | null
         }
         Insert: {
           created_at?: string | null
           email: string
+          expire_at?: string | null
           id?: string
+          name?: string | null
+          phone?: string | null
+          plan?: string | null
+          status?: string | null
           user_id: string
+          whatsapp_number?: string | null
         }
         Update: {
           created_at?: string | null
           email?: string
+          expire_at?: string | null
           id?: string
+          name?: string | null
+          phone?: string | null
+          plan?: string | null
+          status?: string | null
           user_id?: string
+          whatsapp_number?: string | null
         }
         Relationships: []
       }
@@ -185,15 +260,42 @@ export type Database = {
         }
         Relationships: []
       }
+      user_roles: {
+        Row: {
+          created_at: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "user" | "support"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -320,6 +422,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "user", "support"],
+    },
   },
 } as const
