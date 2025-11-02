@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { UserPlus, Calendar, Trash2 } from "lucide-react";
+import { Calendar, Trash2, Edit2 } from "lucide-react";
 
 type UserProfile = {
   id: string;
@@ -24,16 +24,41 @@ type UserProfile = {
   created_at: string;
 };
 
+type Package = {
+  id: string;
+  name: string;
+  duration_days: number;
+  price: number | null;
+};
+
 export default function UserManagement() {
   const [users, setUsers] = useState<UserProfile[]>([]);
+  const [packages, setPackages] = useState<Package[]>([]);
   const [loading, setLoading] = useState(true);
   const [extendDays, setExtendDays] = useState<number>(30);
   const [selectedUserId, setSelectedUserId] = useState<string>("");
+  const [selectedPackageId, setSelectedPackageId] = useState<string>("");
   const { toast } = useToast();
 
   useEffect(() => {
     fetchUsers();
+    fetchPackages();
   }, []);
+
+  const fetchPackages = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('packages')
+        .select('*')
+        .eq('is_active', true)
+        .order('duration_days', { ascending: true });
+
+      if (error) throw error;
+      setPackages(data || []);
+    } catch (error) {
+      console.error('Error fetching packages:', error);
+    }
+  };
 
   const fetchUsers = async () => {
     try {
@@ -102,6 +127,92 @@ export default function UserManagement() {
     }
   };
 
+  const changePackage = async () => {
+    try {
+      const selectedPackage = packages.find(p => p.id === selectedPackageId);
+      if (!selectedPackage) return;
+
+      const newExpire = new Date();
+      newExpire.setDate(newExpire.getDate() + selectedPackage.duration_days);
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({ 
+          plan: selectedPackage.name.toLowerCase(),
+          expire_at: newExpire.toISOString(),
+          status: 'active'
+        })
+        .eq('user_id', selectedUserId);
+
+      if (error) throw error;
+
+      // Log activity
+      const { data: { session } } = await supabase.auth.getSession();
+      await supabase
+        .from('activity_logs')
+        .insert({
+          admin_id: session?.user.id,
+          action: 'change_package',
+          target_user_id: selectedUserId,
+          details: `Mengubah paket menjadi ${selectedPackage.name} (${selectedPackage.duration_days} hari)`
+        });
+
+      toast({
+        title: "Berhasil",
+        description: `Paket user diubah menjadi ${selectedPackage.name}`
+      });
+
+      fetchUsers();
+      setSelectedUserId("");
+      setSelectedPackageId("");
+    } catch (error) {
+      console.error('Error changing package:', error);
+      toast({
+        title: "Error",
+        description: "Gagal mengubah paket",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const toggleUserStatus = async (userId: string, currentStatus: string) => {
+    const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+    
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ status: newStatus })
+        .eq('user_id', userId);
+
+      if (error) throw error;
+
+      // Log activity
+      const { data: { session } } = await supabase.auth.getSession();
+      await supabase
+        .from('activity_logs')
+        .insert({
+          admin_id: session?.user.id,
+          action: 'toggle_status',
+          target_user_id: userId,
+          details: `Mengubah status menjadi ${newStatus}`
+        });
+
+      toast({
+        title: "Berhasil",
+        description: `Status user diubah menjadi ${newStatus}`
+      });
+
+      fetchUsers();
+    } catch (error) {
+      console.error('Error toggling status:', error);
+      toast({
+        title: "Error",
+        description: "Gagal mengubah status",
+        variant: "destructive"
+      });
+    }
+  };
+
   const deleteUser = async (userId: string) => {
     if (!confirm('Apakah Anda yakin ingin menghapus user ini?')) return;
 
@@ -146,6 +257,10 @@ export default function UserManagement() {
   };
 
   const getStatusBadge = (expireAt: string | null, status: string) => {
+    if (status === 'inactive') {
+      return <span className="px-2 py-1 rounded-full text-xs bg-gray-500/10 text-gray-500">Inactive</span>;
+    }
+    
     if (!expireAt) return <span className="px-2 py-1 rounded-full text-xs bg-gray-500/10">Unknown</span>;
     
     const isExpired = new Date(expireAt) < new Date();
@@ -208,12 +323,62 @@ export default function UserManagement() {
                       <TableCell>{formatDate(user.expire_at)}</TableCell>
                       <TableCell>
                         <div className="flex gap-2">
+                          {/* Ubah Paket */}
                           <Dialog>
                             <DialogTrigger asChild>
                               <Button 
                                 size="sm" 
                                 variant="outline"
                                 onClick={() => setSelectedUserId(user.user_id)}
+                                title="Ubah Paket"
+                              >
+                                <Edit2 className="h-4 w-4" />
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                              <DialogHeader>
+                                <DialogTitle>Ubah Paket Langganan</DialogTitle>
+                                <DialogDescription>
+                                  Ubah paket untuk {user.email}
+                                </DialogDescription>
+                              </DialogHeader>
+                              <div className="space-y-4 py-4">
+                                <div>
+                                  <Label>Pilih Paket</Label>
+                                  <Select value={selectedPackageId} onValueChange={setSelectedPackageId}>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Pilih paket..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {packages.map((pkg) => (
+                                        <SelectItem key={pkg.id} value={pkg.id}>
+                                          {pkg.name} - {pkg.duration_days} hari
+                                          {pkg.price && ` (Rp ${pkg.price.toLocaleString('id-ID')})`}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <p className="text-xs text-muted-foreground mt-2">
+                                    Durasi akan otomatis disesuaikan dengan paket yang dipilih
+                                  </p>
+                                </div>
+                              </div>
+                              <DialogFooter>
+                                <Button onClick={changePackage} disabled={!selectedPackageId}>
+                                  Ubah Paket
+                                </Button>
+                              </DialogFooter>
+                            </DialogContent>
+                          </Dialog>
+
+                          {/* Perpanjang Manual */}
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                onClick={() => setSelectedUserId(user.user_id)}
+                                title="Perpanjang Manual"
                               >
                                 <Calendar className="h-4 w-4" />
                               </Button>
@@ -243,10 +408,23 @@ export default function UserManagement() {
                               </DialogFooter>
                             </DialogContent>
                           </Dialog>
+
+                          {/* Toggle Active/Inactive */}
+                          <Button
+                            size="sm"
+                            variant={user.status === 'active' ? "default" : "secondary"}
+                            onClick={() => toggleUserStatus(user.user_id, user.status)}
+                            title={user.status === 'active' ? 'Nonaktifkan User' : 'Aktifkan User'}
+                          >
+                            {user.status === 'active' ? 'Active' : 'Inactive'}
+                          </Button>
+
+                          {/* Hapus User */}
                           <Button
                             size="sm"
                             variant="destructive"
                             onClick={() => deleteUser(user.user_id)}
+                            title="Hapus User"
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>

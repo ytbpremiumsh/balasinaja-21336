@@ -386,33 +386,6 @@ export default function Settings() {
             </div>
           </CardContent>
         </Card>
-
-        {/* System Info */}
-        <Card className="shadow-card">
-          <CardHeader>
-            <CardTitle>Informasi Sistem</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-3 text-sm">
-              <div className="flex justify-between py-2 border-b">
-                <span className="text-muted-foreground">Version:</span>
-                <span className="font-medium">1.0.0</span>
-              </div>
-              <div className="flex justify-between py-2 border-b">
-                <span className="text-muted-foreground">Database:</span>
-                <span className="font-medium">Lovable Cloud (PostgreSQL)</span>
-              </div>
-              <div className="flex justify-between py-2 border-b">
-                <span className="text-muted-foreground">Backend:</span>
-                <span className="font-medium">Supabase Edge Functions</span>
-              </div>
-              <div className="flex justify-between py-2">
-                <span className="text-muted-foreground">Status:</span>
-                <Badge className="bg-success">Online</Badge>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
       </ExpiredUserGuard>
     </Layout>

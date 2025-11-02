@@ -27,12 +27,20 @@ export function ExpiredUserGuard({ children }: ExpiredUserGuardProps) {
 
       const { data, error } = await supabase
         .from('profiles')
-        .select('expire_at')
+        .select('expire_at, status')
         .eq('user_id', session.user.id)
         .single();
 
       if (error) throw error;
 
+      // Check if user is inactive
+      if (data?.status === 'inactive') {
+        setIsExpired(true);
+        setLoading(false);
+        return;
+      }
+
+      // Check if subscription expired
       if (data?.expire_at) {
         const expireDate = new Date(data.expire_at);
         const now = new Date();
