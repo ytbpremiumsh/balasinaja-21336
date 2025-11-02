@@ -200,10 +200,10 @@ export default function UserManagement() {
                   {users.map((user) => (
                     <TableRow key={user.id}>
                       <TableCell>{user.name || '-'}</TableCell>
-                      <TableCell>{user.email}</TableCell>
+                      <TableCell>{user.email || '-'}</TableCell>
                       <TableCell>{user.whatsapp_number || user.phone || '-'}</TableCell>
                       <TableCell>{getStatusBadge(user.expire_at, user.status)}</TableCell>
-                      <TableCell className="capitalize">{user.plan}</TableCell>
+                      <TableCell className="capitalize">{user.plan || 'trial'}</TableCell>
                       <TableCell>{formatDate(user.created_at)}</TableCell>
                       <TableCell>{formatDate(user.expire_at)}</TableCell>
                       <TableCell>
