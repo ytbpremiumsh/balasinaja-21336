@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 
 import { Layout } from "@/components/Layout";
+import { ExpiredUserGuard } from "@/components/ExpiredUserGuard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Settings as SettingsIcon, Webhook, Bot, Zap, Save, Key } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -169,7 +170,8 @@ export default function Settings() {
 
   return (
     <Layout>
-      <div className="space-y-6 animate-fade-in">
+      <ExpiredUserGuard>
+        <div className="space-y-6 animate-fade-in">
         <div>
           <h1 className="text-4xl font-bold flex items-center gap-3">
             <SettingsIcon className="w-8 h-8 text-primary" />
@@ -412,6 +414,7 @@ export default function Settings() {
           </CardContent>
         </Card>
       </div>
+      </ExpiredUserGuard>
     </Layout>
   );
 }

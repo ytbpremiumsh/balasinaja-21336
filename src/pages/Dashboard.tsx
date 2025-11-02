@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MessageSquare, Inbox, Bot, Users, TrendingUp, BarChart3 } from "lucide-react";
 import { Layout } from "@/components/Layout";
 import { User } from "@supabase/supabase-js";
+import { SubscriptionInfo } from "@/components/SubscriptionInfo";
 
 export default function Dashboard() {
   const [user, setUser] = useState<User | null>(null);
@@ -142,6 +143,9 @@ export default function Dashboard() {
             Selamat datang di BalasinAja - Sistem autoreply WhatsApp AI
           </p>
         </div>
+
+        {/* Subscription Info Card */}
+        <SubscriptionInfo />
 
         {/* Response Rate Card - Full Width */}
         <Card className="gradient-card shadow-card border-0 bg-gradient-to-br from-cyan-500/10 via-blue-500/10 to-purple-500/10">

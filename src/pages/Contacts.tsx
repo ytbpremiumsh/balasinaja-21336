@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Layout } from "@/components/Layout";
+import { ExpiredUserGuard } from "@/components/ExpiredUserGuard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users } from "lucide-react";
 
@@ -33,7 +34,8 @@ export default function Contacts() {
 
   return (
     <Layout>
-      <div className="space-y-6 animate-fade-in">
+      <ExpiredUserGuard>
+        <div className="space-y-6 animate-fade-in">
         <div>
           <h1 className="text-4xl font-bold flex items-center gap-3">
             <Users className="w-8 h-8 text-primary" />
@@ -82,6 +84,7 @@ export default function Contacts() {
           </CardContent>
         </Card>
       </div>
+      </ExpiredUserGuard>
     </Layout>
   );
 }
