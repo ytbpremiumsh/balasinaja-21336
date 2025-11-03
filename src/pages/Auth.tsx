@@ -18,16 +18,40 @@ export default function Auth() {
 
   useEffect(() => {
     // Check if user is already logged in
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session) {
-        navigate("/");
+        // Check if user is admin
+        const { data: roles } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', session.user.id)
+          .eq('role', 'admin')
+          .maybeSingle();
+        
+        if (roles) {
+          navigate("/admin");
+        } else {
+          navigate("/");
+        }
       }
     });
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session) {
-        navigate("/");
+        // Check if user is admin
+        const { data: roles } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', session.user.id)
+          .eq('role', 'admin')
+          .maybeSingle();
+        
+        if (roles) {
+          navigate("/admin");
+        } else {
+          navigate("/");
+        }
       }
     });
 
@@ -54,16 +78,32 @@ export default function Auth() {
         });
         setIsSignUp(false);
       } else {
-        const { error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
         if (error) throw error;
-        toast({
-          title: "Login berhasil!",
-          description: "Selamat datang kembali.",
-        });
-        navigate("/");
+        
+        // Check if user is admin
+        if (data.session) {
+          const { data: roles } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', data.session.user.id)
+            .eq('role', 'admin')
+            .maybeSingle();
+          
+          toast({
+            title: "Login berhasil!",
+            description: "Selamat datang kembali.",
+          });
+          
+          if (roles) {
+            navigate("/admin");
+          } else {
+            navigate("/");
+          }
+        }
       }
     } catch (error: any) {
       toast({

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { MessageSquare, Inbox, Bot, Users, Settings, Sparkles, LogOut, Brain, Shield, UserCog, Package, ScrollText } from "lucide-react";
+import { MessageSquare, Inbox, Bot, Users, Settings, Sparkles, LogOut, Brain, Shield, UserCog, Package, ScrollText, CreditCard, Bell } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,8 @@ const adminNavigation = [
   { name: "Dashboard Admin", href: "/admin", icon: Shield },
   { name: "Manajemen User", href: "/admin/users", icon: UserCog },
   { name: "Manajemen Paket", href: "/admin/packages", icon: Package },
+  { name: "Verifikasi Pembayaran", href: "/admin/payments", icon: Bell },
+  { name: "Pengaturan Pembayaran", href: "/admin/payment-settings", icon: CreditCard },
   { name: "Log Aktivitas", href: "/admin/logs", icon: ScrollText },
 ];
 
@@ -83,6 +85,18 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
           </Link>
           
           <div className="flex items-center gap-2">
+            <Link 
+              to="/subscription"
+              className={cn(
+                "flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors",
+                location.pathname === "/subscription"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              )}
+            >
+              <Package className="w-4 h-4" />
+              Langganan
+            </Link>
             <Link 
               to="/settings"
               className={cn(
