@@ -1,1 +1,4 @@
 project_id = "akjiryahivlnutfhvycp"
+
+[functions.balasinaja]
+verify_jwt = false

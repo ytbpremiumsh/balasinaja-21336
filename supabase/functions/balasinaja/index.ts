@@ -128,11 +128,14 @@ serve(async (req) => {
       }
     }
 
-    // AI fallback for text messages
-    if (messageType === 'text') {
+    // AI fallback for text and image messages
+    if (messageType === 'text' || messageType === 'image') {
       console.log('🤖 Attempting AI reply...');
       
-      const aiReply = await generateAiReply(supabase, userId, messageText);
+      // For image messages, get the image URL from payload
+      const imageUrl = messageType === 'image' ? (payload.media_url || payload.url || '') : '';
+      
+      const aiReply = await generateAiReply(supabase, userId, messageText, imageUrl);
       
       if (aiReply) {
         console.log('✅ AI generated reply');
@@ -180,7 +183,7 @@ serve(async (req) => {
   }
 });
 
-async function generateAiReply(supabase: any, userId: string, question: string): Promise<string> {
+async function generateAiReply(supabase: any, userId: string, question: string, imageUrl: string = ''): Promise<string> {
   try {
     // Get AI settings
     const { data: settings } = await supabase
@@ -234,21 +237,42 @@ async function generateAiReply(supabase: any, userId: string, question: string):
     if (aiVendor === 'lovable') {
       apiUrl = 'https://ai.gateway.lovable.dev/v1/chat/completions';
       apiKey = Deno.env.get('LOVABLE_API_KEY') || '';
+      
+      // Build user message content based on whether there's an image
+      let userContent: any;
+      if (imageUrl) {
+        userContent = [
+          { type: 'text', text: userPrompt },
+          { type: 'image_url', image_url: { url: imageUrl } }
+        ];
+      } else {
+        userContent = userPrompt;
+      }
+      
       requestBody = {
         model: aiModel,
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
+          { role: 'user', content: userContent }
         ],
         max_tokens: 512,
       };
     } else if (aiVendor === 'gemini') {
       apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${aiModel}:generateContent`;
       apiKey = aiApiKey;
+      
+      const parts: any[] = [{ text: `${systemPrompt}\n\n${userPrompt}` }];
+      if (imageUrl) {
+        parts.push({
+          inlineData: {
+            mimeType: 'image/jpeg',
+            data: await fetchImageAsBase64(imageUrl)
+          }
+        });
+      }
+      
       requestBody = {
-        contents: [{
-          parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }]
-        }],
+        contents: [{ parts }],
         generationConfig: {
           maxOutputTokens: 512,
           temperature: 0.7,
@@ -257,11 +281,22 @@ async function generateAiReply(supabase: any, userId: string, question: string):
     } else if (aiVendor === 'openai') {
       apiUrl = 'https://api.openai.com/v1/chat/completions';
       apiKey = aiApiKey;
+      
+      let userContent: any;
+      if (imageUrl) {
+        userContent = [
+          { type: 'text', text: userPrompt },
+          { type: 'image_url', image_url: { url: imageUrl } }
+        ];
+      } else {
+        userContent = userPrompt;
+      }
+      
       requestBody = {
         model: aiModel,
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
+          { role: 'user', content: userContent }
         ],
         max_tokens: 512,
         temperature: 0.7,
@@ -269,11 +304,22 @@ async function generateAiReply(supabase: any, userId: string, question: string):
     } else if (aiVendor === 'openrouter') {
       apiUrl = 'https://openrouter.ai/api/v1/chat/completions';
       apiKey = aiApiKey;
+      
+      let userContent: any;
+      if (imageUrl) {
+        userContent = [
+          { type: 'text', text: userPrompt },
+          { type: 'image_url', image_url: { url: imageUrl } }
+        ];
+      } else {
+        userContent = userPrompt;
+      }
+      
       requestBody = {
         model: aiModel,
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
+          { role: 'user', content: userContent }
         ],
         max_tokens: 512,
         temperature: 0.7,
@@ -321,6 +367,18 @@ async function generateAiReply(supabase: any, userId: string, question: string):
 
   } catch (error) {
     console.error('❌ Error generating AI reply:', error);
+    return '';
+  }
+}
+
+async function fetchImageAsBase64(url: string): Promise<string> {
+  try {
+    const response = await fetch(url);
+    const arrayBuffer = await response.arrayBuffer();
+    const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+    return base64;
+  } catch (error) {
+    console.error('❌ Error fetching image:', error);
     return '';
   }
 }
