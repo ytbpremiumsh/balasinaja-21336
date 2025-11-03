@@ -246,55 +246,145 @@ export default function Dashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {dailyStats.map((day, index) => {
-                const maxValue = Math.max(...dailyStats.map(d => d.total), 1);
-                const totalWidth = (day.total / maxValue) * 100;
-                const triggerWidth = day.total > 0 ? (day.trigger / day.total) * totalWidth : 0;
-                const aiWidth = day.total > 0 ? (day.ai / day.total) * totalWidth : 0;
-                const noReplyWidth = totalWidth - triggerWidth - aiWidth;
-
-                return (
-                  <div key={index} className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium w-20">{day.date}</span>
-                      <div className="flex gap-4 text-xs text-muted-foreground">
-                        <span>Total: {day.total}</span>
-                        <span className="text-green-600">Trigger: {day.trigger}</span>
-                        <span className="text-purple-600">AI: {day.ai}</span>
-                        <span className="text-orange-600">No Reply: {day.total - day.trigger - day.ai}</span>
+            <div className="space-y-6">
+              {/* Chart Area */}
+              <div className="relative h-64 border-l-2 border-b-2 border-muted-foreground/20 pl-4 pb-4">
+                {/* Y-axis labels */}
+                <div className="absolute left-0 top-0 bottom-8 flex flex-col justify-between text-xs text-muted-foreground">
+                  {[...Array(6)].map((_, i) => {
+                    const maxValue = Math.max(...dailyStats.map(d => d.total), 1);
+                    const value = Math.round((maxValue * (5 - i)) / 5);
+                    return (
+                      <div key={i} className="text-right pr-2">
+                        {value}
                       </div>
-                    </div>
-                    <div className="relative h-8 bg-muted rounded-lg overflow-hidden">
-                      <div 
-                        className="absolute h-full bg-gradient-to-r from-green-500 to-green-600 transition-all duration-500"
-                        style={{ width: `${triggerWidth}%` }}
+                    );
+                  })}
+                </div>
+
+                {/* Chart canvas */}
+                <div className="ml-8 h-full relative">
+                  <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+                    {/* Grid lines */}
+                    {[...Array(6)].map((_, i) => (
+                      <line
+                        key={i}
+                        x1="0"
+                        y1={i * 20}
+                        x2="100"
+                        y2={i * 20}
+                        stroke="currentColor"
+                        className="text-muted-foreground/10"
+                        strokeWidth="0.2"
                       />
-                      <div 
-                        className="absolute h-full bg-gradient-to-r from-purple-500 to-purple-600 transition-all duration-500"
-                        style={{ left: `${triggerWidth}%`, width: `${aiWidth}%` }}
-                      />
-                      <div 
-                        className="absolute h-full bg-gradient-to-r from-orange-400 to-orange-500 transition-all duration-500"
-                        style={{ left: `${triggerWidth + aiWidth}%`, width: `${noReplyWidth}%` }}
-                      />
-                    </div>
+                    ))}
+
+                    {/* Lines */}
+                    {dailyStats.length > 1 && (() => {
+                      const maxValue = Math.max(...dailyStats.map(d => d.total), 1);
+                      const points = dailyStats.map((day, i) => ({
+                        x: (i / (dailyStats.length - 1)) * 100,
+                        yTotal: 100 - (day.total / maxValue) * 100,
+                        yTrigger: 100 - (day.trigger / maxValue) * 100,
+                        yAi: 100 - (day.ai / maxValue) * 100,
+                      }));
+
+                      return (
+                        <>
+                          {/* Total line */}
+                          <polyline
+                            points={points.map(p => `${p.x},${p.yTotal}`).join(' ')}
+                            fill="none"
+                            stroke="rgb(59, 130, 246)"
+                            strokeWidth="0.5"
+                            className="transition-all duration-300"
+                          />
+                          {/* Trigger line */}
+                          <polyline
+                            points={points.map(p => `${p.x},${p.yTrigger}`).join(' ')}
+                            fill="none"
+                            stroke="rgb(34, 197, 94)"
+                            strokeWidth="0.5"
+                            className="transition-all duration-300"
+                          />
+                          {/* AI line */}
+                          <polyline
+                            points={points.map(p => `${p.x},${p.yAi}`).join(' ')}
+                            fill="none"
+                            stroke="rgb(168, 85, 247)"
+                            strokeWidth="0.5"
+                            className="transition-all duration-300"
+                          />
+                        </>
+                      );
+                    })()}
+                  </svg>
+
+                  {/* Dots overlay */}
+                  <div className="absolute inset-0">
+                    {dailyStats.map((day, i) => {
+                      const maxValue = Math.max(...dailyStats.map(d => d.total), 1);
+                      const xPos = (i / (dailyStats.length - 1)) * 100;
+                      const yTotal = 100 - (day.total / maxValue) * 100;
+                      const yTrigger = 100 - (day.trigger / maxValue) * 100;
+                      const yAi = 100 - (day.ai / maxValue) * 100;
+
+                      return (
+                        <div key={i} className="absolute" style={{ left: `${xPos}%`, top: 0, bottom: 0 }}>
+                          {/* Total dot */}
+                          {day.total > 0 && (
+                            <div
+                              className="absolute w-3 h-3 -ml-1.5 bg-blue-500 rounded-full border-2 border-background shadow-lg hover:scale-125 transition-transform cursor-pointer"
+                              style={{ top: `${yTotal}%`, marginTop: '-6px' }}
+                              title={`Total: ${day.total}`}
+                            />
+                          )}
+                          {/* Trigger dot */}
+                          {day.trigger > 0 && (
+                            <div
+                              className="absolute w-3 h-3 -ml-1.5 bg-green-500 rounded-full border-2 border-background shadow-lg hover:scale-125 transition-transform cursor-pointer"
+                              style={{ top: `${yTrigger}%`, marginTop: '-6px' }}
+                              title={`Trigger: ${day.trigger}`}
+                            />
+                          )}
+                          {/* AI dot */}
+                          {day.ai > 0 && (
+                            <div
+                              className="absolute w-3 h-3 -ml-1.5 bg-purple-500 rounded-full border-2 border-background shadow-lg hover:scale-125 transition-transform cursor-pointer"
+                              style={{ top: `${yAi}%`, marginTop: '-6px' }}
+                              title={`AI: ${day.ai}`}
+                            />
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
-            </div>
-            <div className="mt-6 flex gap-6 justify-center text-xs">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded bg-gradient-to-r from-green-500 to-green-600"></div>
-                <span>Trigger Reply</span>
+                </div>
+
+                {/* X-axis labels */}
+                <div className="ml-8 mt-2 flex justify-between text-xs text-muted-foreground">
+                  {dailyStats.map((day, i) => (
+                    <div key={i} className="text-center" style={{ width: `${100 / dailyStats.length}%` }}>
+                      {day.date}
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded bg-gradient-to-r from-purple-500 to-purple-600"></div>
-                <span>AI Reply</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded bg-gradient-to-r from-orange-400 to-orange-500"></div>
-                <span>No Reply</span>
+
+              {/* Legend */}
+              <div className="flex gap-6 justify-center text-sm">
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded-full bg-blue-500 border-2 border-background shadow"></div>
+                  <span>Total Pesan</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded-full bg-green-500 border-2 border-background shadow"></div>
+                  <span>Trigger Reply</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded-full bg-purple-500 border-2 border-background shadow"></div>
+                  <span>AI Reply</span>
+                </div>
               </div>
             </div>
           </CardContent>
