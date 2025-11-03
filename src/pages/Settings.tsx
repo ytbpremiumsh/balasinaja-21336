@@ -32,7 +32,7 @@ export default function Settings() {
   // Settings state
   const [onesenderApiUrl, setOnesenderApiUrl] = useState("");
   const [onesenderApiKey, setOnesenderApiKey] = useState("");
-  const [aiVendor, setAiVendor] = useState("lovable");
+  const [aiVendor, setAiVendor] = useState("gemini");
   const [aiApiKey, setAiApiKey] = useState("");
   const [aiModel, setAiModel] = useState("");
   const [systemPrompt, setSystemPrompt] = useState("");
@@ -64,7 +64,7 @@ export default function Settings() {
 
         setOnesenderApiUrl(settingsMap.onesender_api_url || "");
         setOnesenderApiKey(settingsMap.onesender_api_key || "");
-        setAiVendor(settingsMap.ai_vendor || "lovable");
+        setAiVendor(settingsMap.ai_vendor || "gemini");
         setAiApiKey(settingsMap.ai_api_key || "");
         setAiModel(settingsMap.ai_model || "");
         setSystemPrompt(settingsMap.system_prompt || "");
@@ -234,25 +234,22 @@ export default function Settings() {
                 value={aiVendor}
                 onChange={(e) => setAiVendor(e.target.value)}
               >
-                <option value="lovable">Lovable AI (Free - Gemini & GPT-5)</option>
                 <option value="gemini">Google Gemini</option>
                 <option value="openai">OpenAI</option>
                 <option value="openrouter">OpenRouter</option>
               </select>
             </div>
 
-            {aiVendor !== 'lovable' && (
-              <div className="space-y-2">
-                <Label htmlFor="ai-api-key">AI API Key</Label>
-                <Input
-                  id="ai-api-key"
-                  type="password"
-                  value={aiApiKey}
-                  onChange={(e) => setAiApiKey(e.target.value)}
-                  placeholder="Your AI API Key"
-                />
-              </div>
-            )}
+            <div className="space-y-2">
+              <Label htmlFor="ai-api-key">AI API Key</Label>
+              <Input
+                id="ai-api-key"
+                type="password"
+                value={aiApiKey}
+                onChange={(e) => setAiApiKey(e.target.value)}
+                placeholder="Your AI API Key"
+              />
+            </div>
 
             <div className="space-y-2">
               <Label htmlFor="ai-model">AI Model</Label>
@@ -261,14 +258,12 @@ export default function Settings() {
                 value={aiModel}
                 onChange={(e) => setAiModel(e.target.value)}
                 placeholder={
-                  aiVendor === 'lovable' ? 'google/gemini-2.5-flash' :
                   aiVendor === 'gemini' ? 'gemini-2.5-flash' :
                   aiVendor === 'openai' ? 'gpt-4o-mini' :
                   'auto'
                 }
               />
               <p className="text-xs text-muted-foreground">
-                {aiVendor === 'lovable' && 'Model: google/gemini-2.5-flash, google/gemini-2.5-pro, openai/gpt-5, openai/gpt-5-mini'}
                 {aiVendor === 'gemini' && 'Model: gemini-2.5-flash, gemini-2.5-pro'}
                 {aiVendor === 'openai' && 'Model: gpt-4o, gpt-4o-mini, gpt-4-turbo'}
                 {aiVendor === 'openrouter' && 'Model: auto atau model spesifik dari OpenRouter'}
@@ -301,7 +296,7 @@ export default function Settings() {
                 <li>✓ Balasan otomatis cerdas ketika tidak ada trigger match</li>
                 <li>✓ Menggunakan Knowledge Base sebagai konteks</li>
                 <li>✓ Respons dalam bahasa Indonesia</li>
-                <li>✓ {aiVendor === 'lovable' ? 'Gratis menggunakan Lovable AI' : `Custom ${aiVendor} integration`}</li>
+                <li>✓ Support membaca gambar dan teks</li>
               </ul>
             </div>
           </CardContent>
@@ -356,7 +351,7 @@ export default function Settings() {
               <p className="text-sm font-medium mb-2">Webhook Endpoint:</p>
               <div className="rounded-lg bg-muted p-4 relative">
                 <code className="text-xs block overflow-x-auto break-all pr-10">
-                  {`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/onesender-webhook?user_id=${user?.id || 'loading...'}`}
+                  {`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/balasinaja?user_id=${user?.id || 'loading...'}`}
                 </code>
                 <Button
                   size="sm"
@@ -364,7 +359,7 @@ export default function Settings() {
                   className="absolute top-2 right-2"
                   onClick={() => {
                     navigator.clipboard.writeText(
-                      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/onesender-webhook?user_id=${user?.id}`
+                      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/balasinaja?user_id=${user?.id}`
                     );
                     setCopied(true);
                     toast({

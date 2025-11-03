@@ -192,9 +192,9 @@ async function generateAiReply(supabase: any, userId: string, question: string, 
       .eq('user_id', userId)
       .in('key', ['ai_vendor', 'ai_api_key', 'ai_model', 'system_prompt']);
 
-    let aiVendor = 'lovable';
+    let aiVendor = 'gemini';
     let aiApiKey = '';
-    let aiModel = 'google/gemini-2.5-flash';
+    let aiModel = 'gemini-2.5-flash';
     let systemPrompt = 'Anda adalah asisten AI yang membantu menjawab pertanyaan pelanggan dengan ramah dan profesional.';
 
     if (settings) {
@@ -234,30 +234,7 @@ async function generateAiReply(supabase: any, userId: string, question: string, 
     let requestBody: any = {};
 
     // Configure based on AI vendor
-    if (aiVendor === 'lovable') {
-      apiUrl = 'https://ai.gateway.lovable.dev/v1/chat/completions';
-      apiKey = Deno.env.get('LOVABLE_API_KEY') || '';
-      
-      // Build user message content based on whether there's an image
-      let userContent: any;
-      if (imageUrl) {
-        userContent = [
-          { type: 'text', text: userPrompt },
-          { type: 'image_url', image_url: { url: imageUrl } }
-        ];
-      } else {
-        userContent = userPrompt;
-      }
-      
-      requestBody = {
-        model: aiModel,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userContent }
-        ],
-        max_tokens: 512,
-      };
-    } else if (aiVendor === 'gemini') {
+    if (aiVendor === 'gemini') {
       apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${aiModel}:generateContent`;
       apiKey = aiApiKey;
       
@@ -336,11 +313,7 @@ async function generateAiReply(supabase: any, userId: string, question: string, 
     };
 
     // Gemini uses API key as query param
-    if (aiVendor === 'gemini') {
-      apiUrl += `?key=${apiKey}`;
-    } else {
-      headers['Authorization'] = `Bearer ${apiKey}`;
-    }
+    apiUrl += `?key=${apiKey}`;
 
     console.log('🌐 Calling AI API:', apiUrl);
 
@@ -359,10 +332,11 @@ async function generateAiReply(supabase: any, userId: string, question: string, 
     const data = await response.json();
 
     // Extract response based on vendor
-    if (aiVendor === 'gemini') {
-      return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
-    } else {
+    if (aiVendor === 'openai' || aiVendor === 'openrouter') {
       return data.choices?.[0]?.message?.content?.trim() || '';
+    } else {
+      // Gemini
+      return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
     }
 
   } catch (error) {

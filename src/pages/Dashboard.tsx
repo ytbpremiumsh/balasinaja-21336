@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { MessageSquare, Inbox, Bot, Users, TrendingUp, BarChart3 } from "lucide-react";
+import { MessageSquare, Inbox, Bot, Users, TrendingUp, BarChart3, Calendar } from "lucide-react";
 import { Layout } from "@/components/Layout";
 import { User } from "@supabase/supabase-js";
 import { SubscriptionInfo } from "@/components/SubscriptionInfo";
+import { format, subDays, startOfDay, endOfDay } from "date-fns";
+import { id as localeId } from "date-fns/locale";
 
 export default function Dashboard() {
   const [user, setUser] = useState<User | null>(null);
@@ -17,6 +19,12 @@ export default function Dashboard() {
     totalKnowledge: 0,
     responseRate: 0,
   });
+  const [dailyStats, setDailyStats] = useState<Array<{
+    date: string;
+    total: number;
+    trigger: number;
+    ai: number;
+  }>>([]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -26,6 +34,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchStats();
+    fetchDailyStats();
 
     // Auto-refresh every 5 seconds
     const refreshInterval = setInterval(() => {
@@ -87,6 +96,40 @@ export default function Dashboard() {
       totalKnowledge: knowledge.count || 0,
       responseRate,
     });
+  };
+
+  const fetchDailyStats = async () => {
+    try {
+      const days = 7;
+      const dailyData: Array<{ date: string; total: number; trigger: number; ai: number }> = [];
+
+      for (let i = days - 1; i >= 0; i--) {
+        const date = subDays(new Date(), i);
+        const start = startOfDay(date).toISOString();
+        const end = endOfDay(date).toISOString();
+
+        const { data: messages } = await supabase
+          .from("inbox")
+          .select("status")
+          .gte("created_at", start)
+          .lte("created_at", end);
+
+        const total = messages?.length || 0;
+        const trigger = messages?.filter(m => m.status === "replied_trigger").length || 0;
+        const ai = messages?.filter(m => m.status === "replied_ai").length || 0;
+
+        dailyData.push({
+          date: format(date, "dd MMM", { locale: localeId }),
+          total,
+          trigger,
+          ai
+        });
+      }
+
+      setDailyStats(dailyData);
+    } catch (error) {
+      console.error("Error fetching daily stats:", error);
+    }
   };
 
   const statCards = [
@@ -194,6 +237,69 @@ export default function Dashboard() {
           ))}
         </div>
 
+        {/* Daily Statistics Chart */}
+        <Card className="shadow-card">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Calendar className="w-5 h-5" />
+              Statistik Pesan 7 Hari Terakhir
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {dailyStats.map((day, index) => {
+                const maxValue = Math.max(...dailyStats.map(d => d.total), 1);
+                const totalWidth = (day.total / maxValue) * 100;
+                const triggerWidth = day.total > 0 ? (day.trigger / day.total) * totalWidth : 0;
+                const aiWidth = day.total > 0 ? (day.ai / day.total) * totalWidth : 0;
+                const noReplyWidth = totalWidth - triggerWidth - aiWidth;
+
+                return (
+                  <div key={index} className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium w-20">{day.date}</span>
+                      <div className="flex gap-4 text-xs text-muted-foreground">
+                        <span>Total: {day.total}</span>
+                        <span className="text-green-600">Trigger: {day.trigger}</span>
+                        <span className="text-purple-600">AI: {day.ai}</span>
+                        <span className="text-orange-600">No Reply: {day.total - day.trigger - day.ai}</span>
+                      </div>
+                    </div>
+                    <div className="relative h-8 bg-muted rounded-lg overflow-hidden">
+                      <div 
+                        className="absolute h-full bg-gradient-to-r from-green-500 to-green-600 transition-all duration-500"
+                        style={{ width: `${triggerWidth}%` }}
+                      />
+                      <div 
+                        className="absolute h-full bg-gradient-to-r from-purple-500 to-purple-600 transition-all duration-500"
+                        style={{ left: `${triggerWidth}%`, width: `${aiWidth}%` }}
+                      />
+                      <div 
+                        className="absolute h-full bg-gradient-to-r from-orange-400 to-orange-500 transition-all duration-500"
+                        style={{ left: `${triggerWidth + aiWidth}%`, width: `${noReplyWidth}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mt-6 flex gap-6 justify-center text-xs">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded bg-gradient-to-r from-green-500 to-green-600"></div>
+                <span>Trigger Reply</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded bg-gradient-to-r from-purple-500 to-purple-600"></div>
+                <span>AI Reply</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded bg-gradient-to-r from-orange-400 to-orange-500"></div>
+                <span>No Reply</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         <Card className="shadow-card">
           <CardHeader>
             <CardTitle>Webhook Information</CardTitle>
@@ -202,7 +308,7 @@ export default function Dashboard() {
             <div className="rounded-lg bg-muted p-4">
               <p className="text-sm font-medium mb-2">Webhook Endpoint (User-Specific):</p>
               <code className="text-xs bg-background rounded px-3 py-2 block overflow-x-auto break-all">
-                {`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/onesender-webhook?user_id=${user?.id || 'YOUR_USER_ID'}`}
+                {`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/balasinaja?user_id=${user?.id || 'YOUR_USER_ID'}`}
               </code>
             </div>
             <p className="text-sm text-muted-foreground">
