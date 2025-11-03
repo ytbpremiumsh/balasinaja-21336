@@ -194,6 +194,89 @@ export type Database = {
         }
         Relationships: []
       }
+      payment_proofs: {
+        Row: {
+          amount: number
+          created_at: string | null
+          id: string
+          notes: string | null
+          package_id: string | null
+          payment_method: string
+          proof_image_url: string
+          status: string
+          user_id: string | null
+          verified_at: string | null
+          verified_by: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          package_id?: string | null
+          payment_method: string
+          proof_image_url: string
+          status?: string
+          user_id?: string | null
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          package_id?: string | null
+          payment_method?: string
+          proof_image_url?: string
+          status?: string
+          user_id?: string | null
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_proofs_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "packages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_settings: {
+        Row: {
+          account_holder: string | null
+          account_number: string | null
+          bank_name: string | null
+          created_at: string | null
+          id: string
+          qris_code: string | null
+          qris_image_url: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          account_holder?: string | null
+          account_number?: string | null
+          bank_name?: string | null
+          created_at?: string | null
+          id?: string
+          qris_code?: string | null
+          qris_image_url?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          account_holder?: string | null
+          account_number?: string | null
+          bank_name?: string | null
+          created_at?: string | null
+          id?: string
+          qris_code?: string | null
+          qris_image_url?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string | null
