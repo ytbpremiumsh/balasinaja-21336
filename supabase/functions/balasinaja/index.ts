@@ -312,8 +312,14 @@ async function generateAiReply(supabase: any, userId: string, question: string, 
       'Content-Type': 'application/json',
     };
 
-    // Gemini uses API key as query param
-    apiUrl += `?key=${apiKey}`;
+    // Configure authentication based on vendor
+    if (aiVendor === 'gemini') {
+      // Gemini uses API key as query param
+      apiUrl += `?key=${apiKey}`;
+    } else {
+      // OpenAI and OpenRouter use Authorization header
+      headers['Authorization'] = `Bearer ${apiKey}`;
+    }
 
     console.log('🌐 Calling AI API:', apiUrl);
 
