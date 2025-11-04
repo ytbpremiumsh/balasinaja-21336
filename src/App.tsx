@@ -9,6 +9,7 @@ import Autoreplies from "./pages/Autoreplies";
 import AIKnowledge from "./pages/AIKnowledge";
 import AIBehavior from "./pages/AIBehavior";
 import Contacts from "./pages/Contacts";
+import Broadcast from "./pages/Broadcast";
 import Settings from "./pages/Settings";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
@@ -38,6 +39,7 @@ const App = () => (
           <Route path="/ai-knowledge" element={<ProtectedRoute><AIKnowledge /></ProtectedRoute>} />
           <Route path="/ai-behavior" element={<ProtectedRoute><AIBehavior /></ProtectedRoute>} />
           <Route path="/contacts" element={<ProtectedRoute><Contacts /></ProtectedRoute>} />
+          <Route path="/broadcast" element={<ProtectedRoute><Broadcast /></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
           <Route path="/subscription" element={<ProtectedRoute><Subscription /></ProtectedRoute>} />
           

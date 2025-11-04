@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { MessageSquare, Inbox, Bot, Users, Settings, Sparkles, LogOut, Brain, Shield, UserCog, Package, ScrollText, CreditCard, Bell } from "lucide-react";
+import { MessageSquare, Inbox, Bot, Users, Settings, Sparkles, LogOut, Brain, Shield, UserCog, Package, ScrollText, CreditCard, Bell, Radio } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ const userNavigation = [
   { name: "AI Knowledge", href: "/ai-knowledge", icon: Bot },
   { name: "AI Behavior", href: "/ai-behavior", icon: Brain },
   { name: "Contacts", href: "/contacts", icon: Users },
+  { name: "Broadcast", href: "/broadcast", icon: MessageSquare },
 ];
 
 const adminNavigation = [
