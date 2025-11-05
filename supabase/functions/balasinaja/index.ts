@@ -52,9 +52,11 @@ serve(async (req) => {
     const messageId = payload.message_id;
 
     // Save or update contact
-    const { error: contactError } = await supabase
+    const { data: contactData, error: contactError } = await supabase
       .from('contacts')
-      .upsert({ phone, name, user_id: userId }, { onConflict: 'phone,user_id' });
+      .upsert({ phone, name, user_id: userId }, { onConflict: 'phone,user_id' })
+      .select()
+      .single();
 
     if (contactError) {
       console.error('Error saving contact:', contactError);
@@ -62,7 +64,22 @@ serve(async (req) => {
       console.log('📇 Contact saved:', phone);
     }
 
-    // Save to inbox
+    // Get the contact's category if exists
+    let categoryId = null;
+    if (contactData) {
+      const { data: categoryData } = await supabase
+        .from('contact_categories')
+        .select('category_id')
+        .eq('contact_id', contactData.id)
+        .maybeSingle();
+      
+      if (categoryData) {
+        categoryId = categoryData.category_id;
+        console.log('📋 Contact assigned to category:', categoryId);
+      }
+    }
+
+    // Save to inbox with category
     const { error: inboxError } = await supabase
       .from('inbox')
       .insert({
@@ -72,7 +89,8 @@ serve(async (req) => {
         inbox_type: messageType,
         inbox_message: messageText,
         status: 'received',
-        user_id: userId
+        user_id: userId,
+        category_id: categoryId
       });
 
     if (inboxError) {

@@ -25,6 +25,7 @@ interface Message {
   status: string | null;
   created_at: string;
   category_id: string | null;
+  categories: Category | null;
 }
 
 export default function Inbox() {
@@ -59,7 +60,7 @@ export default function Inbox() {
     setLoading(true);
     let query = supabase
       .from("inbox")
-      .select("*")
+      .select("*, categories(id, name)")
       .order("created_at", { ascending: false })
       .limit(50);
 
@@ -150,7 +151,14 @@ export default function Inbox() {
                           })}
                         </p>
                       </div>
-                      {getStatusBadge(message.status)}
+                      <div className="flex gap-2">
+                        {message.categories && (
+                          <Badge variant="outline" className="bg-primary/10">
+                            {message.categories.name}
+                          </Badge>
+                        )}
+                        {getStatusBadge(message.status)}
+                      </div>
                     </div>
                     
                     <div className="space-y-1">
