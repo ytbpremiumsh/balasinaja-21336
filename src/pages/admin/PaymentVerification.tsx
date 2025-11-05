@@ -149,12 +149,43 @@ export default function PaymentVerification() {
 
         if (profileError) throw profileError;
 
+        // Send WhatsApp notification in background (don't wait for it)
+        supabase.functions.invoke('send-subscription-notification', {
+          body: {
+            userId: userId,
+            packageName: packageData?.name || "Paket",
+            expiryDate: newExpireDate.toISOString()
+          }
+        }).catch(err => console.error('Failed to send subscription notification:', err));
+
+        // Create notification for user
+        await supabase.from("notifications").insert({
+          user_id: userId,
+          type: "payment_approved",
+          title: "Pembayaran Disetujui",
+          message: `Pembayaran Anda untuk paket ${packageData?.name} telah disetujui. Langganan Anda diperpanjang ${durationDays} hari.`,
+        });
+
         // Log activity
         await supabase.from("activity_logs").insert({
           admin_id: session.user.id,
           target_user_id: userId,
           action: "perpanjang_langganan",
           details: `Langganan diperpanjang ${durationDays} hari melalui verifikasi pembayaran`,
+        });
+      } else {
+        // Create notification for rejected payment
+        const { data: packageData } = await supabase
+          .from("packages")
+          .select("name")
+          .eq("id", packageId)
+          .single();
+
+        await supabase.from("notifications").insert({
+          user_id: userId,
+          type: "payment_rejected",
+          title: "Pembayaran Ditolak",
+          message: `Pembayaran Anda untuk paket ${packageData?.name} telah ditolak. Silakan hubungi admin untuk informasi lebih lanjut.`,
         });
       }
 

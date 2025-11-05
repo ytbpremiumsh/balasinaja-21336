@@ -8,7 +8,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Send, Plus, Trash2, Edit, Users, Radio } from "lucide-react";
+import { Send, Plus, Trash2, Edit, Users, Radio, Calendar, FileText } from "lucide-react";
+import { TemplateLibrary } from "@/components/broadcast/TemplateLibrary";
+import { CSVUpload } from "@/components/broadcast/CSVUpload";
 import {
   Dialog,
   DialogContent,
@@ -52,6 +54,12 @@ export default function Broadcast() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [message, setMessage] = useState("");
+  const [mediaType, setMediaType] = useState("text");
+  const [mediaUrl, setMediaUrl] = useState("");
+  const [scheduledAt, setScheduledAt] = useState("");
+  const [delayMin, setDelayMin] = useState(1);
+  const [delayMax, setDelayMax] = useState(3);
+  const [usePersonalization, setUsePersonalization] = useState(false);
   
   // Category dialog states
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
@@ -253,7 +261,13 @@ export default function Broadcast() {
 
       if (ccError) throw ccError;
 
-      const recipients = contactCategories?.map((cc: any) => cc.contacts.phone) || [];
+      // Filter only opt-in contacts
+      const recipients = contactCategories
+        ?.filter((cc: any) => cc.contacts.opt_in !== false)
+        .map((cc: any) => ({
+          phone: cc.contacts.phone,
+          name: cc.contacts.name,
+        })) || [];
 
       if (recipients.length === 0) {
         toast({
@@ -271,18 +285,29 @@ export default function Broadcast() {
           recipients,
           message,
           category_id: selectedCategory,
+          media_type: mediaType,
+          media_url: mediaUrl || undefined,
+          scheduled_at: scheduledAt || undefined,
+          delay_min: delayMin,
+          delay_max: delayMax,
+          use_personalization: usePersonalization,
         },
       });
 
       if (error) throw error;
 
+      const isScheduled = data?.scheduled;
       toast({
-        title: "Broadcast Terkirim!",
-        description: `Pesan berhasil dikirim ke ${recipients.length} kontak`,
+        title: isScheduled ? "Broadcast Dijadwalkan!" : "Broadcast Terkirim!",
+        description: isScheduled 
+          ? `Pesan dijadwalkan untuk ${recipients.length} kontak`
+          : `Pesan berhasil dikirim ke ${recipients.length} kontak`,
       });
 
       setMessage("");
       setSelectedCategory("");
+      setMediaUrl("");
+      setScheduledAt("");
     } catch (error: any) {
       toast({
         title: "Error",
@@ -398,6 +423,47 @@ export default function Broadcast() {
             </CardContent>
           </Card>
 
+          {/* Template Library */}
+          <TemplateLibrary
+            onSelectTemplate={(template) => {
+              setMessage(template.message);
+              setMediaType(template.media_type);
+              setMediaUrl(template.media_url || "");
+            }}
+          />
+
+          {/* CSV Upload */}
+          <Card className="shadow-card">
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <FileText className="w-5 h-5" />
+                  Upload Kontak CSV
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const csvContent = "phone,name\n62812345678,John Doe\n62898765432,Jane Smith";
+                    const blob = new Blob([csvContent], { type: 'text/csv' });
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'template_kontak.csv';
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                  }}
+                >
+                  <FileText className="w-4 h-4 mr-2" />
+                  Download Template CSV
+                </Button>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <CSVUpload onContactsUploaded={loadContacts} />
+            </CardContent>
+          </Card>
+
           {/* Broadcast Form */}
           <Card className="shadow-card gradient-card">
             <CardHeader>
@@ -407,31 +473,121 @@ export default function Broadcast() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="category-select">Pilih Kategori</Label>
-                <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                  <SelectTrigger id="category-select">
-                    <SelectValue placeholder="Pilih kategori..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((category) => (
-                      <SelectItem key={category.id} value={category.id}>
-                        {category.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="category-select">Pilih Kategori</Label>
+                  <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                    <SelectTrigger id="category-select">
+                      <SelectValue placeholder="Pilih kategori..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories.map((category) => (
+                        <SelectItem key={category.id} value={category.id}>
+                          {category.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="media-type">Tipe Media</Label>
+                  <Select value={mediaType} onValueChange={setMediaType}>
+                    <SelectTrigger id="media-type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="text">Text</SelectItem>
+                      <SelectItem value="image">Image</SelectItem>
+                      <SelectItem value="video">Video</SelectItem>
+                      <SelectItem value="document">Document</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
+              {mediaType !== "text" && (
+                <div className="space-y-2">
+                  <Label htmlFor="media-url">URL Media</Label>
+                  <Input
+                    id="media-url"
+                    value={mediaUrl}
+                    onChange={(e) => setMediaUrl(e.target.value)}
+                    placeholder="https://example.com/image.jpg"
+                  />
+                </div>
+              )}
+
               <div className="space-y-2">
-                <Label htmlFor="broadcast-message">Pesan Broadcast</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="broadcast-message">Pesan Broadcast</Label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setUsePersonalization(!usePersonalization)}
+                    className={usePersonalization ? "text-primary" : ""}
+                  >
+                    <FileText className="w-4 h-4 mr-2" />
+                    Personalisasi {usePersonalization ? "✓" : ""}
+                  </Button>
+                </div>
                 <Textarea
                   id="broadcast-message"
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
-                  placeholder="Tulis pesan yang akan dikirim ke semua kontak dalam kategori..."
+                  placeholder="Tulis pesan... Gunakan {{nama}}, {{tanggal}}, {{phone}} untuk personalisasi"
                   className="min-h-[150px]"
                 />
+                {usePersonalization && (
+                  <p className="text-xs text-muted-foreground">
+                    Variabel tersedia: {'{{nama}}'}, {'{{tanggal}}'}, {'{{phone}}'}
+                  </p>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="scheduled-at">Jadwal Kirim (Opsional)</Label>
+                  <Input
+                    id="scheduled-at"
+                    type="datetime-local"
+                    value={scheduledAt}
+                    onChange={(e) => setScheduledAt(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="delay-min">Delay Min (detik)</Label>
+                  <Input
+                    id="delay-min"
+                    type="number"
+                    min="1"
+                    value={delayMin}
+                    onChange={(e) => setDelayMin(parseInt(e.target.value))}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="delay-max">Delay Max (detik)</Label>
+                  <Input
+                    id="delay-max"
+                    type="number"
+                    min="1"
+                    value={delayMax}
+                    onChange={(e) => setDelayMax(parseInt(e.target.value))}
+                  />
+                </div>
+              </div>
+
+              <div className="p-3 bg-muted/50 rounded-lg space-y-2">
+                <h4 className="font-medium text-sm">Fitur Anti-Block:</h4>
+                <ul className="text-xs text-muted-foreground space-y-1">
+                  <li>✓ Random delay antara {delayMin}-{delayMax} detik</li>
+                  <li>✓ Auto retry jika gagal kirim</li>
+                  <li>✓ Queue system untuk pengiriman aman</li>
+                  <li>✓ Hanya kirim ke kontak yang opt-in</li>
+                </ul>
               </div>
 
               <Button
@@ -440,8 +596,17 @@ export default function Broadcast() {
                 className="w-full"
                 size="lg"
               >
-                <Send className="w-4 h-4 mr-2" />
-                {loading ? "Mengirim..." : "Kirim Broadcast"}
+                {scheduledAt ? (
+                  <>
+                    <Calendar className="w-4 h-4 mr-2" />
+                    {loading ? "Menjadwalkan..." : "Jadwalkan Broadcast"}
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4 mr-2" />
+                    {loading ? "Mengirim..." : "Kirim Broadcast"}
+                  </>
+                )}
               </Button>
             </CardContent>
           </Card>

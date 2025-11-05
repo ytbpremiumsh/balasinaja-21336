@@ -187,28 +187,41 @@ export default function Settings() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Zap className="w-5 h-5" />
-              Konfigurasi API OneSender
+              Konfigurasi API OneSender (Wajib)
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-4 mb-4">
+              <p className="text-sm font-medium mb-2 text-amber-600">⚠️ Pengaturan Wajib:</p>
+              <p className="text-sm text-muted-foreground">
+                Setiap user <strong>WAJIB mengatur API OneSender sendiri</strong> untuk menggunakan fitur Broadcast dan Auto Reply. 
+                Tanpa pengaturan ini, sistem tidak akan bisa mengirim/menerima pesan WhatsApp.
+              </p>
+            </div>
             <div className="space-y-2">
-              <Label htmlFor="api-url">API URL</Label>
+              <Label htmlFor="api-url">API URL OneSender</Label>
               <Input
                 id="api-url"
                 value={onesenderApiUrl}
                 onChange={(e) => setOnesenderApiUrl(e.target.value)}
-                placeholder="http://domainmu.com/api/v1/messages"
+                placeholder="https://api.onesender.id/api/v1/message/send"
               />
+              <p className="text-xs text-muted-foreground">
+                Format URL API endpoint untuk mengirim pesan
+              </p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="api-key">API Key</Label>
+              <Label htmlFor="api-key">API Key OneSender</Label>
               <Input
                 id="api-key"
                 type="password"
                 value={onesenderApiKey}
                 onChange={(e) => setOnesenderApiKey(e.target.value)}
-                placeholder="Your OneSender API Key"
+                placeholder="Bearer token dari dashboard OneSender"
               />
+              <p className="text-xs text-muted-foreground">
+                API Key / Bearer Token dari akun OneSender Anda
+              </p>
             </div>
             <Button onClick={saveSettings} disabled={loading} className="w-full">
               <Save className="w-4 h-4 mr-2" />

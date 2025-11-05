@@ -5,14 +5,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Lock, Mail } from "lucide-react";
+import { Lock, Mail, User, Phone } from "lucide-react";
 
 export default function Auth() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
+  const [whatsappNumber, setWhatsappNumber] = useState("");
   const [loading, setLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -64,19 +68,38 @@ export default function Auth() {
 
     try {
       if (isSignUp) {
-        const { error } = await supabase.auth.signUp({
+        if (!name || !whatsappNumber) {
+          toast({
+            title: "Error",
+            description: "Nama dan No WhatsApp harus diisi",
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
+        
+        const { data: signUpData, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
-            emailRedirectTo: `${window.location.origin}/`
+            emailRedirectTo: `${window.location.origin}/`,
+            data: {
+              name: name,
+              phone: whatsappNumber
+            }
           }
         });
         if (error) throw error;
-        toast({
-          title: "Akun berhasil dibuat!",
-          description: "Silakan login dengan kredensial Anda.",
-        });
-        setIsSignUp(false);
+        
+        // Show success dialog
+        setShowSuccessDialog(true);
+        
+        // Send welcome notification in background (don't wait for it)
+        if (signUpData.user?.id) {
+          supabase.functions.invoke('send-welcome-notification', {
+            body: { userId: signUpData.user.id }
+          }).catch(err => console.error('Failed to send welcome notification:', err));
+        }
       } else {
         const { data, error } = await supabase.auth.signInWithPassword({
           email,
@@ -135,6 +158,40 @@ export default function Auth() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleAuth} className="space-y-4">
+            {isSignUp && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="name" className="flex items-center gap-2">
+                    <User className="w-4 h-4" />
+                    Nama Lengkap
+                  </Label>
+                  <Input
+                    id="name"
+                    type="text"
+                    placeholder="Nama Anda"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required
+                    disabled={loading}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="whatsapp" className="flex items-center gap-2">
+                    <Phone className="w-4 h-4" />
+                    No WhatsApp
+                  </Label>
+                  <Input
+                    id="whatsapp"
+                    type="tel"
+                    placeholder="628123456789"
+                    value={whatsappNumber}
+                    onChange={(e) => setWhatsappNumber(e.target.value)}
+                    required
+                    disabled={loading}
+                  />
+                </div>
+              </>
+            )}
             <div className="space-y-2">
               <Label htmlFor="email" className="flex items-center gap-2">
                 <Mail className="w-4 h-4" />
@@ -188,6 +245,31 @@ export default function Auth() {
           </div>
         </CardContent>
       </Card>
+
+      <AlertDialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Registrasi Berhasil! 🎉</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>Akun Anda telah berhasil dibuat.</p>
+              <p className="font-medium">Silakan login kembali menggunakan kredensial yang telah Anda daftarkan untuk melanjutkan.</p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <Button 
+              onClick={() => {
+                setShowSuccessDialog(false);
+                setIsSignUp(false);
+                setName("");
+                setWhatsappNumber("");
+                setPassword("");
+              }}
+            >
+              OK, Login Sekarang
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

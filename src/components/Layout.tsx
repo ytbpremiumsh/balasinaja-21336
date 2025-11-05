@@ -1,10 +1,17 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { MessageSquare, Inbox, Bot, Users, Settings, Sparkles, LogOut, Brain, Shield, UserCog, Package, ScrollText, CreditCard, Bell, Radio } from "lucide-react";
+import { MessageSquare, Inbox, Bot, Users, Settings, Sparkles, LogOut, Brain, Shield, UserCog, Package, ScrollText, CreditCard, Bell, Radio, BellDot, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const userNavigation = [
   { name: "Dashboard", href: "/", icon: Sparkles },
@@ -13,7 +20,11 @@ const userNavigation = [
   { name: "AI Knowledge", href: "/ai-knowledge", icon: Bot },
   { name: "AI Behavior", href: "/ai-behavior", icon: Brain },
   { name: "Contacts", href: "/contacts", icon: Users },
-  { name: "Broadcast", href: "/broadcast", icon: MessageSquare },
+];
+
+const broadcastNavigation = [
+  { name: "Broadcast", href: "/broadcast", icon: Radio },
+  { name: "Laporan Broadcast", href: "/broadcast-report", icon: ScrollText },
 ];
 
 const adminNavigation = [
@@ -22,6 +33,7 @@ const adminNavigation = [
   { name: "Manajemen Paket", href: "/admin/packages", icon: Package },
   { name: "Verifikasi Pembayaran", href: "/admin/payments", icon: Bell },
   { name: "Pengaturan Pembayaran", href: "/admin/payment-settings", icon: CreditCard },
+  { name: "Notifikasi WhatsApp", href: "/admin/whatsapp-notifications", icon: MessageSquare },
   { name: "Log Aktivitas", href: "/admin/logs", icon: ScrollText },
 ];
 
@@ -30,6 +42,8 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
   const navigate = useNavigate();
   const [isAdmin, setIsAdmin] = useState(false);
   const [navigation, setNavigation] = useState(userNavigation);
+  const [pendingPayments, setPendingPayments] = useState(0);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
 
   useEffect(() => {
     const checkAdminRole = async () => {
@@ -50,6 +64,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
         // Set navigation based on role
         if (hasAdminRole) {
           setNavigation([...adminNavigation, ...userNavigation]);
+          fetchPendingPayments();
         } else {
           setNavigation(userNavigation);
         }
@@ -59,7 +74,64 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
     };
 
     checkAdminRole();
+    fetchUnreadNotifications();
   }, []);
+
+  useEffect(() => {
+    const channels = [];
+    
+    if (isAdmin) {
+      // Setup realtime subscription for payment updates
+      const paymentChannel = supabase
+        .channel('payment_notifications')
+        .on('postgres_changes', 
+          { event: '*', schema: 'public', table: 'payment_proofs' },
+          () => {
+            fetchPendingPayments();
+          }
+        )
+        .subscribe();
+      channels.push(paymentChannel);
+    }
+
+    // Setup realtime subscription for user notifications
+    const notificationChannel = supabase
+      .channel('user_notifications')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'notifications' },
+        () => {
+          fetchUnreadNotifications();
+        }
+      )
+      .subscribe();
+    channels.push(notificationChannel);
+
+    return () => {
+      channels.forEach(channel => supabase.removeChannel(channel));
+    };
+  }, [isAdmin]);
+
+  const fetchPendingPayments = async () => {
+    const { count } = await supabase
+      .from('payment_proofs')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'pending');
+    
+    setPendingPayments(count || 0);
+  };
+
+  const fetchUnreadNotifications = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+
+    const { count } = await supabase
+      .from('notifications')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', session.user.id)
+      .eq('is_read', false);
+    
+    setUnreadNotifications(count || 0);
+  };
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
@@ -113,6 +185,19 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
             <Button
               variant="ghost"
               size="sm"
+              onClick={() => navigate("/notifications")}
+              className="flex items-center gap-2 relative"
+            >
+              <BellDot className="w-4 h-4" />
+              {unreadNotifications > 0 && (
+                <Badge variant="destructive" className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-xs">
+                  {unreadNotifications}
+                </Badge>
+              )}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={handleLogout}
               className="flex items-center gap-2"
             >
@@ -129,12 +214,13 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
           <div className="flex gap-2 overflow-x-auto py-2">
             {navigation.map((item) => {
               const isActive = location.pathname === item.href;
+              const isPendingPayments = item.href === "/admin/payments" && pendingPayments > 0;
               return (
                 <Link
                   key={item.name}
                   to={item.href}
                   className={cn(
-                    "flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all whitespace-nowrap",
+                    "flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all whitespace-nowrap relative",
                     isActive
                       ? "bg-primary text-primary-foreground shadow-md"
                       : "text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -142,9 +228,46 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                 >
                   <item.icon className="w-4 h-4" />
                   {item.name}
+                  {isPendingPayments && (
+                    <Badge variant="destructive" className="ml-1 h-5 px-1.5 text-xs">
+                      {pendingPayments}
+                    </Badge>
+                  )}
                 </Link>
               );
             })}
+            
+            {/* Broadcast Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className={cn(
+                    "flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all whitespace-nowrap",
+                    (location.pathname === "/broadcast" || location.pathname === "/broadcast-report")
+                      ? "bg-primary text-primary-foreground shadow-md"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  )}
+                >
+                  <Radio className="w-4 h-4" />
+                  Broadcast
+                  <ChevronDown className="w-4 h-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                {broadcastNavigation.map((item) => (
+                  <DropdownMenuItem key={item.name} asChild>
+                    <Link
+                      to={item.href}
+                      className="flex items-center gap-2 w-full cursor-pointer"
+                    >
+                      <item.icon className="w-4 h-4" />
+                      {item.name}
+                    </Link>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </nav>

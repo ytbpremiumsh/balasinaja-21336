@@ -10,6 +10,8 @@ import AIKnowledge from "./pages/AIKnowledge";
 import AIBehavior from "./pages/AIBehavior";
 import Contacts from "./pages/Contacts";
 import Broadcast from "./pages/Broadcast";
+import BroadcastReport from "./pages/BroadcastReport";
+import Notifications from "./pages/Notifications";
 import Settings from "./pages/Settings";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
@@ -18,6 +20,7 @@ import UserManagement from "./pages/admin/UserManagement";
 import PackageManagement from "./pages/admin/PackageManagement";
 import PaymentVerification from "./pages/admin/PaymentVerification";
 import PaymentSettings from "./pages/admin/PaymentSettings";
+import WhatsAppNotifications from "./pages/admin/WhatsAppNotifications";
 import ActivityLogs from "./pages/admin/ActivityLogs";
 import Subscription from "./pages/Subscription";
 import { ProtectedRoute } from "./components/ProtectedRoute";
@@ -40,6 +43,8 @@ const App = () => (
           <Route path="/ai-behavior" element={<ProtectedRoute><AIBehavior /></ProtectedRoute>} />
           <Route path="/contacts" element={<ProtectedRoute><Contacts /></ProtectedRoute>} />
           <Route path="/broadcast" element={<ProtectedRoute><Broadcast /></ProtectedRoute>} />
+          <Route path="/broadcast-report" element={<ProtectedRoute><BroadcastReport /></ProtectedRoute>} />
+          <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
           <Route path="/subscription" element={<ProtectedRoute><Subscription /></ProtectedRoute>} />
           
@@ -49,6 +54,7 @@ const App = () => (
           <Route path="/admin/packages" element={<ProtectedRoute><AdminRoute><PackageManagement /></AdminRoute></ProtectedRoute>} />
           <Route path="/admin/payments" element={<ProtectedRoute><AdminRoute><PaymentVerification /></AdminRoute></ProtectedRoute>} />
           <Route path="/admin/payment-settings" element={<ProtectedRoute><AdminRoute><PaymentSettings /></AdminRoute></ProtectedRoute>} />
+          <Route path="/admin/whatsapp-notifications" element={<ProtectedRoute><AdminRoute><WhatsAppNotifications /></AdminRoute></ProtectedRoute>} />
           <Route path="/admin/logs" element={<ProtectedRoute><AdminRoute><ActivityLogs /></AdminRoute></ProtectedRoute>} />
           
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

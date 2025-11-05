@@ -8,9 +8,16 @@ const corsHeaders = {
 };
 
 interface BroadcastRequest {
-  recipients: string[];
+  recipients: Array<{ phone: string; name?: string }>;
   message: string;
   category_id: string;
+  media_type?: string;
+  media_url?: string;
+  scheduled_at?: string;
+  delay_min?: number;
+  delay_max?: number;
+  use_personalization?: boolean;
+  template_id?: string;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -37,15 +44,28 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error("Unauthorized");
     }
 
-    const { recipients, message, category_id }: BroadcastRequest = await req.json();
+    const { 
+      recipients, 
+      message, 
+      category_id,
+      media_type = "text",
+      media_url,
+      scheduled_at,
+      delay_min = 1,
+      delay_max = 3,
+      use_personalization = false,
+      template_id
+    }: BroadcastRequest = await req.json();
 
     console.log("📢 Broadcast request:", {
       userId: user.id,
       categoryId: category_id,
       recipientCount: recipients.length,
+      mediaType: media_type,
+      scheduled: scheduled_at,
     });
 
-    // Get user settings
+    // Get user settings - WAJIB dari user sendiri
     const { data: settings, error: settingsError } = await supabase
       .from("settings")
       .select("*")
@@ -53,19 +73,17 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (settingsError) throw settingsError;
 
-    const settingsMap = settings.reduce((acc: any, setting: any) => {
+    const settingsMap = settings?.reduce((acc: any, setting: any) => {
       acc[setting.key] = setting.value;
       return acc;
-    }, {});
+    }, {}) || {};
 
     const apiUrl = settingsMap.onesender_api_url;
     const apiKey = settingsMap.onesender_api_key;
 
     if (!apiUrl || !apiKey) {
-      throw new Error("OneSender API not configured. Please set API URL and API Key in Settings.");
+      throw new Error("OneSender API belum dikonfigurasi. Silakan set API URL dan API Key di halaman Settings Anda.");
     }
-
-    console.log("🔧 Using OneSender API:", apiUrl);
 
     // Create broadcast log
     const { data: logData, error: logError } = await supabase
@@ -75,7 +93,14 @@ const handler = async (req: Request): Promise<Response> => {
         category_id,
         message,
         total_recipients: recipients.length,
-        status: "processing",
+        status: scheduled_at ? "scheduled" : "processing",
+        media_type,
+        media_url,
+        scheduled_at,
+        delay_min,
+        delay_max,
+        use_personalization,
+        template_id,
       })
       .select()
       .single();
@@ -84,39 +109,161 @@ const handler = async (req: Request): Promise<Response> => {
 
     const logId = logData.id;
 
-    // Send messages to all recipients
+    // Create queue entries for each recipient
+    const queueEntries = recipients.map((recipient) => {
+      let personalizedMessage = message;
+      
+      // Apply personalization if enabled
+      if (use_personalization && recipient.name) {
+        personalizedMessage = message
+          .replace(/\{\{nama\}\}/g, recipient.name)
+          .replace(/\{\{tanggal\}\}/g, new Date().toLocaleDateString('id-ID'))
+          .replace(/\{\{phone\}\}/g, recipient.phone);
+      }
+
+      return {
+        broadcast_log_id: logId,
+        phone: recipient.phone,
+        name: recipient.name,
+        message: personalizedMessage,
+        media_type,
+        media_url,
+        status: scheduled_at ? "scheduled" : "pending",
+        scheduled_at: scheduled_at || null,
+      };
+    });
+
+    const { error: queueError } = await supabase
+      .from("broadcast_queue")
+      .insert(queueEntries);
+
+    if (queueError) throw queueError;
+
+    // If scheduled, don't send now
+    if (scheduled_at) {
+      console.log("📅 Broadcast scheduled for:", scheduled_at);
+      return new Response(
+        JSON.stringify({
+          success: true,
+          scheduled: true,
+          broadcast_id: logId,
+          total: recipients.length,
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        }
+      );
+    }
+
+    // Process queue immediately if not scheduled
     let successCount = 0;
     let failCount = 0;
 
-    for (const phone of recipients) {
+    for (const recipient of recipients) {
       try {
+        // Get personalized message from queue
+        const { data: queueItem } = await supabase
+          .from("broadcast_queue")
+          .select("*")
+          .eq("broadcast_log_id", logId)
+          .eq("phone", recipient.phone)
+          .single();
+
+        if (!queueItem) continue;
+
+        // Update status to processing
+        await supabase
+          .from("broadcast_queue")
+          .update({ status: "processing" })
+          .eq("id", queueItem.id);
+
+        // Prepare request body for OneSender API
+        const requestBody: any = {
+          to: recipient.phone,
+          type: media_type,
+          priority: 10
+        };
+
+        // Format message based on type for OneSender
+        if (media_type === "text") {
+          requestBody.text = {
+            body: queueItem.message
+          };
+        } else if (media_type === "image") {
+          requestBody.image = {
+            link: media_url,
+            caption: queueItem.message
+          };
+        } else if (media_type === "video") {
+          requestBody.video = {
+            link: media_url,
+            caption: queueItem.message
+          };
+        } else if (media_type === "document") {
+          requestBody.document = {
+            link: media_url,
+            caption: queueItem.message,
+            filename: "document.pdf"
+          };
+        }
+
+        console.log("📤 Sending to OneSender API:", { 
+          url: apiUrl, 
+          phone: recipient.phone,
+          messageType: media_type
+        });
+
         const response = await fetch(apiUrl, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             "Authorization": `Bearer ${apiKey}`,
           },
-          body: JSON.stringify({
-            phone: phone,
-            message: message,
-            message_type: "text",
-          }),
+          body: JSON.stringify(requestBody),
         });
 
         if (response.ok) {
           successCount++;
-          console.log(`✅ Message sent to ${phone}`);
+          await supabase
+            .from("broadcast_queue")
+            .update({ 
+              status: "sent", 
+              sent_at: new Date().toISOString() 
+            })
+            .eq("id", queueItem.id);
+          console.log(`✅ Message sent to ${recipient.phone}`);
         } else {
           failCount++;
-          console.error(`❌ Failed to send to ${phone}:`, await response.text());
+          const errorText = await response.text();
+          await supabase
+            .from("broadcast_queue")
+            .update({ 
+              status: "failed",
+              error_message: errorText,
+            })
+            .eq("id", queueItem.id);
+          console.error(`❌ Failed to send to ${recipient.phone}:`, errorText);
         }
       } catch (error) {
         failCount++;
-        console.error(`❌ Error sending to ${phone}:`, error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.error(`❌ Error sending to ${recipient.phone}:`, errorMessage);
+        
+        // Update queue with error
+        await supabase
+          .from("broadcast_queue")
+          .update({ 
+            status: "failed",
+            error_message: errorMessage,
+          })
+          .eq("broadcast_log_id", logId)
+          .eq("phone", recipient.phone);
       }
 
-      // Small delay to avoid rate limiting
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      // Random delay between delay_min and delay_max seconds
+      const delaySeconds = delay_min + Math.random() * (delay_max - delay_min);
+      await new Promise((resolve) => setTimeout(resolve, delaySeconds * 1000));
     }
 
     // Update broadcast log
@@ -138,6 +285,7 @@ const handler = async (req: Request): Promise<Response> => {
     return new Response(
       JSON.stringify({
         success: true,
+        broadcast_id: logId,
         total: recipients.length,
         sent: successCount,
         failed: failCount,

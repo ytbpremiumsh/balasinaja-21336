@@ -81,6 +81,22 @@ serve(async (req) => {
     }
     console.log('📥 Message saved to inbox');
 
+    // Fetch conversation history (last 20 messages from this phone number)
+    console.log('📚 Fetching conversation history for:', phone);
+    const { data: conversationHistory, error: historyError } = await supabase
+      .from('inbox')
+      .select('inbox_type, inbox_message, reply_type, reply_message, created_at')
+      .eq('user_id', userId)
+      .eq('phone', phone)
+      .order('created_at', { ascending: false })
+      .limit(20);
+
+    if (historyError) {
+      console.error('Error fetching conversation history:', historyError);
+    } else {
+      console.log('📚 Loaded', conversationHistory?.length || 0, 'previous messages');
+    }
+
     // Check for trigger match
     const { data: trigger } = await supabase
       .from('autoreplies')
@@ -135,7 +151,7 @@ serve(async (req) => {
       // For image messages, get the image URL from payload
       const imageUrl = messageType === 'image' ? (payload.media_url || payload.url || '') : '';
       
-      const aiReply = await generateAiReply(supabase, userId, messageText, imageUrl);
+      const aiReply = await generateAiReply(supabase, userId, messageText, imageUrl, conversationHistory || []);
       
       if (aiReply) {
         console.log('✅ AI generated reply');
@@ -183,7 +199,13 @@ serve(async (req) => {
   }
 });
 
-async function generateAiReply(supabase: any, userId: string, question: string, imageUrl: string = ''): Promise<string> {
+async function generateAiReply(
+  supabase: any, 
+  userId: string, 
+  question: string, 
+  imageUrl: string = '',
+  conversationHistory: any[] = []
+): Promise<string> {
   try {
     // Get AI settings
     const { data: settings } = await supabase
@@ -192,9 +214,9 @@ async function generateAiReply(supabase: any, userId: string, question: string, 
       .eq('user_id', userId)
       .in('key', ['ai_vendor', 'ai_api_key', 'ai_model', 'system_prompt']);
 
-    let aiVendor = 'gemini';
+    let aiVendor = 'lovable';
     let aiApiKey = '';
-    let aiModel = 'gemini-2.5-flash';
+    let aiModel = 'google/gemini-2.5-flash';
     let systemPrompt = 'Anda adalah asisten AI yang membantu menjawab pertanyaan pelanggan dengan ramah dan profesional.';
 
     if (settings) {
@@ -225,16 +247,56 @@ async function generateAiReply(supabase: any, userId: string, question: string, 
         .join('\n---\n');
     }
 
+    // Build conversation history context (reverse to show oldest first)
+    let historyContext = '';
+    if (conversationHistory.length > 0) {
+      historyContext = '\n\n=== Riwayat Percakapan (dari lama ke baru) ===\n';
+      const reversedHistory = [...conversationHistory].reverse();
+      reversedHistory.forEach((msg: any) => {
+        if (msg.inbox_message) {
+          historyContext += `Pengguna: ${msg.inbox_message}\n`;
+        }
+        if (msg.reply_message) {
+          historyContext += `Asisten: ${msg.reply_message}\n`;
+        }
+      });
+      historyContext += '=== Akhir Riwayat ===\n\n';
+      console.log('💬 Including', conversationHistory.length, 'previous messages in context');
+    }
+
     const userPrompt = context 
-      ? `Gunakan knowledge base berikut untuk menjawab:\n\n${context}\n\nPertanyaan: ${question}`
-      : question;
+      ? `Gunakan knowledge base berikut untuk menjawab:\n\n${context}${historyContext}\nPertanyaan saat ini: ${question}`
+      : `${historyContext}Pertanyaan: ${question}`;
 
     let apiUrl = '';
     let apiKey = '';
     let requestBody: any = {};
 
     // Configure based on AI vendor
-    if (aiVendor === 'gemini') {
+    if (aiVendor === 'lovable') {
+      // Use Lovable AI API
+      apiUrl = 'https://api.lovable.app/v1/ai/chat';
+      apiKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+      
+      const messages: any[] = [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ];
+      
+      if (imageUrl) {
+        messages[1].content = [
+          { type: 'text', text: userPrompt },
+          { type: 'image_url', image_url: { url: imageUrl } }
+        ];
+      }
+      
+      requestBody = {
+        model: aiModel,
+        messages: messages,
+        max_tokens: 512,
+        temperature: 0.7,
+      };
+    } else if (aiVendor === 'gemini') {
       apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${aiModel}:generateContent`;
       apiKey = aiApiKey;
       
@@ -313,7 +375,10 @@ async function generateAiReply(supabase: any, userId: string, question: string, 
     };
 
     // Configure authentication based on vendor
-    if (aiVendor === 'gemini') {
+    if (aiVendor === 'lovable') {
+      // Lovable AI uses Authorization header
+      headers['Authorization'] = `Bearer ${apiKey}`;
+    } else if (aiVendor === 'gemini') {
       // Gemini uses API key as query param
       apiUrl += `?key=${apiKey}`;
     } else {
@@ -338,7 +403,7 @@ async function generateAiReply(supabase: any, userId: string, question: string, 
     const data = await response.json();
 
     // Extract response based on vendor
-    if (aiVendor === 'openai' || aiVendor === 'openrouter') {
+    if (aiVendor === 'lovable' || aiVendor === 'openai' || aiVendor === 'openrouter') {
       return data.choices?.[0]?.message?.content?.trim() || '';
     } else {
       // Gemini
@@ -365,7 +430,7 @@ async function fetchImageAsBase64(url: string): Promise<string> {
 
 async function sendOneSenderMessage(supabase: any, userId: string, to: string, type: string, text: string, image: string): Promise<boolean> {
   try {
-    // Get API URL and Key from database settings
+    // Get user's API settings - WAJIB dari user sendiri
     const { data: settingsData } = await supabase
       .from('settings')
       .select('key, value')
@@ -383,7 +448,7 @@ async function sendOneSenderMessage(supabase: any, userId: string, to: string, t
     const apiKey = settingsMap.onesender_api_key || '';
 
     if (!apiUrl || !apiKey) {
-      console.error('❌ OneSender API URL or key not configured');
+      console.error('❌ OneSender API belum dikonfigurasi di user ini');
       return false;
     }
 
