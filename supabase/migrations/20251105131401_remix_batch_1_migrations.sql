@@ -1,4 +1,6 @@
 
+-- Migration: 20251105121718
+
 -- Migration: 20251103022533
 
 -- Migration: 20251002124045
@@ -721,3 +723,4 @@ CREATE POLICY "Users can view own broadcast_logs" ON public.broadcast_logs
 
 CREATE POLICY "Users can insert own broadcast_logs" ON public.broadcast_logs
   FOR INSERT WITH CHECK (auth.uid() = user_id);
+
