@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { Layout } from "@/components/Layout";
 import { ExpiredUserGuard } from "@/components/ExpiredUserGuard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Settings as SettingsIcon, Webhook, Bot, Zap, Save, Key } from "lucide-react";
+import { Settings as SettingsIcon, Webhook, Bot, Zap, Save, User } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { User } from "@supabase/supabase-js";
+import { User as SupabaseUser } from "@supabase/supabase-js";
 import { Copy, Check } from "lucide-react";
 
 interface SettingRow {
@@ -25,8 +25,7 @@ interface SettingRow {
 export default function Settings() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
-  const [loadingPassword, setLoadingPassword] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<SupabaseUser | null>(null);
   const [copied, setCopied] = useState(false);
   
   // Settings state
@@ -37,16 +36,39 @@ export default function Settings() {
   const [aiModel, setAiModel] = useState("");
   const [systemPrompt, setSystemPrompt] = useState("");
   
-  // Password change state
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  // Profile settings
+  const [businessName, setBusinessName] = useState("");
+  const [whatsappNumber, setWhatsappNumber] = useState("");
 
   useEffect(() => {
     loadSettings();
+    loadProfile();
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
     });
   }, []);
+
+  const loadProfile = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("name, whatsapp_number")
+        .eq("user_id", user.id)
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        setBusinessName(data.name || "");
+        setWhatsappNumber(data.whatsapp_number || "");
+      }
+    } catch (error: any) {
+      console.error("Error loading profile:", error);
+    }
+  };
 
   const loadSettings = async () => {
     try {
@@ -124,39 +146,26 @@ export default function Settings() {
     }
   };
 
-  const changePassword = async () => {
-    if (newPassword !== confirmPassword) {
-      toast({
-        title: "Password tidak cocok",
-        description: "Password baru dan konfirmasi harus sama.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (newPassword.length < 6) {
-      toast({
-        title: "Password terlalu pendek",
-        description: "Password minimal 6 karakter.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setLoadingPassword(true);
+  const saveProfile = async () => {
+    setLoading(true);
     try {
-      const { error } = await supabase.auth.updateUser({
-        password: newPassword
-      });
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          name: businessName,
+          whatsapp_number: whatsappNumber,
+        })
+        .eq("user_id", user.id);
 
       if (error) throw error;
 
       toast({
-        title: "Password berhasil diubah!",
-        description: "Password Anda telah diperbarui.",
+        title: "Profil berhasil diperbarui!",
+        description: "Informasi bisnis Anda telah disimpan.",
       });
-      setNewPassword("");
-      setConfirmPassword("");
     } catch (error: any) {
       toast({
         title: "Error",
@@ -164,9 +173,10 @@ export default function Settings() {
         variant: "destructive",
       });
     } finally {
-      setLoadingPassword(false);
+      setLoading(false);
     }
   };
+
 
   return (
     <Layout>
@@ -181,6 +191,44 @@ export default function Settings() {
             Konfigurasi dan informasi sistem
           </p>
         </div>
+
+        {/* Profile Settings */}
+        <Card className="shadow-card">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <User className="w-5 h-5" />
+              Informasi Bisnis
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="business-name">Nama Bisnis</Label>
+              <Input
+                id="business-name"
+                value={businessName}
+                onChange={(e) => setBusinessName(e.target.value)}
+                placeholder="Nama bisnis atau toko Anda"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="whatsapp">Nomor WhatsApp Bisnis</Label>
+              <Input
+                id="whatsapp"
+                type="tel"
+                value={whatsappNumber}
+                onChange={(e) => setWhatsappNumber(e.target.value)}
+                placeholder="628123456789"
+              />
+              <p className="text-xs text-muted-foreground">
+                Nomor WhatsApp yang digunakan untuk bisnis Anda
+              </p>
+            </div>
+            <Button onClick={saveProfile} disabled={loading} className="w-full">
+              <Save className="w-4 h-4 mr-2" />
+              {loading ? "Menyimpan..." : "Simpan Informasi Bisnis"}
+            </Button>
+          </CardContent>
+        </Card>
 
         {/* OneSender API Configuration */}
         <Card className="shadow-card gradient-card">
@@ -312,42 +360,6 @@ export default function Settings() {
                 <li>✓ Support membaca gambar dan teks</li>
               </ul>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Change Password */}
-        <Card className="shadow-card">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Key className="w-5 h-5" />
-              Ubah Password
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="new-password">Password Baru</Label>
-              <Input
-                id="new-password"
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Masukkan password baru"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="confirm-password">Konfirmasi Password</Label>
-              <Input
-                id="confirm-password"
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Konfirmasi password baru"
-              />
-            </div>
-            <Button onClick={changePassword} disabled={loadingPassword} className="w-full">
-              <Key className="w-4 h-4 mr-2" />
-              {loadingPassword ? "Mengubah..." : "Ubah Password"}
-            </Button>
           </CardContent>
         </Card>
 

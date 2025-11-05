@@ -4,9 +4,18 @@ import { Layout } from "@/components/Layout";
 import { ExpiredUserGuard } from "@/components/ExpiredUserGuard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Inbox as InboxIcon, RefreshCw, Filter } from "lucide-react";
+import { Inbox as InboxIcon, RefreshCw, Filter, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface Category {
   id: string;
@@ -29,6 +38,7 @@ interface Message {
 }
 
 export default function Inbox() {
+  const { toast } = useToast();
   const [messages, setMessages] = useState<Message[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
@@ -76,6 +86,71 @@ export default function Inbox() {
       setMessages(data || []);
     }
     setLoading(false);
+  };
+
+  const assignCategory = async (messageId: string, phone: string, categoryId: string) => {
+    try {
+      // First, check if contact exists
+      const { data: existingContact } = await supabase
+        .from("contacts")
+        .select("id")
+        .eq("phone", phone)
+        .maybeSingle();
+
+      let contactId: string;
+
+      if (existingContact) {
+        contactId = existingContact.id;
+      } else {
+        // Create new contact
+        const { data: newContact, error: contactError } = await supabase
+          .from("contacts")
+          .insert({ phone, name: messages.find(m => m.id === messageId)?.name || null })
+          .select("id")
+          .single();
+
+        if (contactError) throw contactError;
+        contactId = newContact.id;
+      }
+
+      // Check if contact already has this category
+      const { data: existingCategoryLink } = await supabase
+        .from("contact_categories")
+        .select("id")
+        .eq("contact_id", contactId)
+        .eq("category_id", categoryId)
+        .maybeSingle();
+
+      if (!existingCategoryLink) {
+        // Add category to contact
+        const { error: linkError } = await supabase
+          .from("contact_categories")
+          .insert({ contact_id: contactId, category_id: categoryId });
+
+        if (linkError) throw linkError;
+      }
+
+      // Update inbox message with category
+      const { error: inboxError } = await supabase
+        .from("inbox")
+        .update({ category_id: categoryId })
+        .eq("id", messageId);
+
+      if (inboxError) throw inboxError;
+
+      toast({
+        title: "Kategori ditambahkan!",
+        description: "Kontak berhasil ditambahkan ke kategori.",
+      });
+
+      fetchMessages();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
   };
 
   const getStatusBadge = (status: string | null) => {
@@ -158,6 +233,31 @@ export default function Inbox() {
                           </Badge>
                         )}
                         {getStatusBadge(message.status)}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button size="sm" variant="outline">
+                              <Tag className="w-4 h-4 mr-1" />
+                              Kategori
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="bg-background">
+                            <DropdownMenuLabel>Pilih Kategori</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            {categories.map((category) => (
+                              <DropdownMenuItem
+                                key={category.id}
+                                onClick={() => assignCategory(message.id, message.phone, category.id)}
+                              >
+                                {category.name}
+                              </DropdownMenuItem>
+                            ))}
+                            {categories.length === 0 && (
+                              <DropdownMenuItem disabled>
+                                Tidak ada kategori
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </div>
                     

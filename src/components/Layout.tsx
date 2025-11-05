@@ -1,17 +1,17 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { MessageSquare, Inbox, Bot, Users, Settings, Sparkles, LogOut, Brain, Shield, UserCog, Package, ScrollText, CreditCard, Bell, Radio, BellDot, ChevronDown } from "lucide-react";
+import { MessageSquare, Inbox, Bot, Users, Settings, Sparkles, Brain, Shield, UserCog, Package, ScrollText, CreditCard, Bell, Radio, BellDot, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { UserAvatar } from "./UserAvatar";
 
 const userNavigation = [
   { name: "Dashboard", href: "/", icon: Sparkles },
@@ -133,15 +133,6 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
     setUnreadNotifications(count || 0);
   };
 
-  const handleLogout = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      toast.error("Gagal logout");
-    } else {
-      toast.success("Berhasil logout");
-      navigate("/auth");
-    }
-  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -195,15 +186,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                 </Badge>
               )}
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleLogout}
-              className="flex items-center gap-2"
-            >
-              <LogOut className="w-4 h-4" />
-              Logout
-            </Button>
+            <UserAvatar />
           </div>
         </div>
       </header>
