@@ -94,7 +94,6 @@ export default function AdminDashboard() {
     <Layout>
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <img src={logo} alt="BalasinAja" className="h-12 w-auto" />
           <div>
             <h1 className="text-3xl font-bold">Dashboard Admin</h1>
             <p className="text-muted-foreground">
