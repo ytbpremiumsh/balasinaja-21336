@@ -28,7 +28,7 @@ const broadcastNavigation = [
 ];
 
 const adminNavigation = [
-  { name: "Dashboard Admin", href: "/admin", icon: Shield, badge: 0 },
+  { name: "Dashboard Admin", href: "/admin", icon: Shield },
   { name: "Manajemen User", href: "/admin/users", icon: UserCog, badge: 0 },
   { name: "Manajemen Paket", href: "/admin/packages", icon: Package, badge: 0 },
   { name: "Verifikasi Pembayaran", href: "/admin/payments", icon: Bell, badge: 0 },
