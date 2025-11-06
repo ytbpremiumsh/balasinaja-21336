@@ -1,144 +1,46 @@
-import { Link } from "react-router-dom";
-
+import { useEffect, useState } from "react";
 import { Layout } from "@/components/Layout";
-import { ExpiredUserGuard } from "@/components/ExpiredUserGuard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Settings as SettingsIcon, Webhook, Bot, Zap, Save, User } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useToast } from "@/hooks/use-toast";
-import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { User as SupabaseUser } from "@supabase/supabase-js";
-import { Copy, Check } from "lucide-react";
-
-interface SettingRow {
-  id: string;
-  key: string;
-  value: string;
-  created_at: string;
-  updated_at: string;
-}
+import { useToast } from "@/hooks/use-toast";
+import { Loader2, Save, User } from "lucide-react";
+import { ExpiredUserGuard } from "@/components/ExpiredUserGuard";
 
 export default function Settings() {
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const { toast } = useToast();
-  const [loading, setLoading] = useState(false);
-  const [user, setUser] = useState<SupabaseUser | null>(null);
-  const [copied, setCopied] = useState(false);
-  
-  // Settings state
-  const [onesenderApiUrl, setOnesenderApiUrl] = useState("");
-  const [onesenderApiKey, setOnesenderApiKey] = useState("");
-  const [aiVendor, setAiVendor] = useState("gemini");
-  const [aiApiKey, setAiApiKey] = useState("");
-  const [aiModel, setAiModel] = useState("");
-  const [systemPrompt, setSystemPrompt] = useState("");
-  
-  // Profile settings
+
   const [businessName, setBusinessName] = useState("");
   const [whatsappNumber, setWhatsappNumber] = useState("");
 
   useEffect(() => {
-    loadSettings();
     loadProfile();
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-    });
   }, []);
 
   const loadProfile = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
 
       const { data, error } = await supabase
         .from("profiles")
         .select("name, whatsapp_number")
-        .eq("user_id", user.id)
+        .eq("user_id", session.user.id)
         .single();
 
       if (error) throw error;
 
-      if (data) {
-        setBusinessName(data.name || "");
-        setWhatsappNumber(data.whatsapp_number || "");
-      }
-    } catch (error: any) {
+      setBusinessName(data?.name || "");
+      setWhatsappNumber(data?.whatsapp_number || "");
+    } catch (error) {
       console.error("Error loading profile:", error);
-    }
-  };
-
-  const loadSettings = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("settings" as any)
-        .select("*");
-
-      if (error) throw error;
-
-      if (data) {
-        const settingsMap = (data as any[]).reduce((acc: any, setting: any) => {
-          acc[setting.key] = setting.value;
-          return acc;
-        }, {});
-
-        setOnesenderApiUrl(settingsMap.onesender_api_url || "");
-        setOnesenderApiKey(settingsMap.onesender_api_key || "");
-        setAiVendor(settingsMap.ai_vendor || "gemini");
-        setAiApiKey(settingsMap.ai_api_key || "");
-        setAiModel(settingsMap.ai_model || "");
-        setSystemPrompt(settingsMap.system_prompt || "");
-      }
-    } catch (error: any) {
-      toast({
-        title: "Error loading settings",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
-
-  const saveSettings = async () => {
-    setLoading(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
-
-      const updates = [
-        { key: "onesender_api_url", value: onesenderApiUrl },
-        { key: "onesender_api_key", value: onesenderApiKey },
-        { key: "ai_vendor", value: aiVendor },
-        { key: "ai_api_key", value: aiApiKey },
-        { key: "ai_model", value: aiModel },
-        { key: "system_prompt", value: systemPrompt },
-      ];
-
-      for (const update of updates) {
-        const { error } = await supabase
-          .from("settings" as any)
-          .upsert(
-            { 
-              user_id: user.id, 
-              key: update.key, 
-              value: update.value, 
-              updated_at: new Date().toISOString() 
-            } as any,
-            { onConflict: 'user_id,key' }
-          );
-
-        if (error) throw error;
-      }
-
-      toast({
-        title: "Settings saved!",
-        description: "Pengaturan berhasil disimpan.",
-      });
-    } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message,
+        description: "Gagal memuat data profil",
         variant: "destructive",
       });
     } finally {
@@ -147,10 +49,10 @@ export default function Settings() {
   };
 
   const saveProfile = async () => {
-    setLoading(true);
+    setSaving(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
 
       const { error } = await supabase
         .from("profiles")
@@ -158,255 +60,89 @@ export default function Settings() {
           name: businessName,
           whatsapp_number: whatsappNumber,
         })
-        .eq("user_id", user.id);
+        .eq("user_id", session.user.id);
 
       if (error) throw error;
 
       toast({
-        title: "Profil berhasil diperbarui!",
-        description: "Informasi bisnis Anda telah disimpan.",
+        title: "Berhasil",
+        description: "Profil berhasil disimpan",
       });
-    } catch (error: any) {
+    } catch (error) {
+      console.error("Error saving profile:", error);
       toast({
         title: "Error",
-        description: error.message,
+        description: "Gagal menyimpan profil",
         variant: "destructive",
       });
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
+  if (loading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
       <ExpiredUserGuard>
-        <div className="space-y-6 animate-fade-in">
-        <div>
-          <h1 className="text-4xl font-bold flex items-center gap-3">
-            <SettingsIcon className="w-8 h-8 text-primary" />
-            Settings
-          </h1>
-          <p className="text-muted-foreground mt-2">
-            Konfigurasi dan informasi sistem
-          </p>
-        </div>
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-3xl font-bold flex items-center gap-2">
+              <User className="w-8 h-8" />
+              Settings
+            </h1>
+            <p className="text-muted-foreground">
+              Kelola informasi bisnis dan profil Anda
+            </p>
+          </div>
 
-        {/* Profile Settings */}
-        <Card className="shadow-card">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <User className="w-5 h-5" />
-              Informasi Bisnis
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="business-name">Nama Bisnis</Label>
-              <Input
-                id="business-name"
-                value={businessName}
-                onChange={(e) => setBusinessName(e.target.value)}
-                placeholder="Nama bisnis atau toko Anda"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="whatsapp">Nomor WhatsApp Bisnis</Label>
-              <Input
-                id="whatsapp"
-                type="tel"
-                value={whatsappNumber}
-                onChange={(e) => setWhatsappNumber(e.target.value)}
-                placeholder="628123456789"
-              />
-              <p className="text-xs text-muted-foreground">
-                Nomor WhatsApp yang digunakan untuk bisnis Anda
-              </p>
-            </div>
-            <Button onClick={saveProfile} disabled={loading} className="w-full">
-              <Save className="w-4 h-4 mr-2" />
-              {loading ? "Menyimpan..." : "Simpan Informasi Bisnis"}
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* OneSender API Configuration */}
-        <Card className="shadow-card gradient-card">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Zap className="w-5 h-5" />
-              Konfigurasi API OneSender (Wajib)
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-4 mb-4">
-              <p className="text-sm font-medium mb-2 text-amber-600">⚠️ Pengaturan Wajib:</p>
-              <p className="text-sm text-muted-foreground">
-                Setiap user <strong>WAJIB mengatur API OneSender sendiri</strong> untuk menggunakan fitur Broadcast dan Auto Reply. 
-                Tanpa pengaturan ini, sistem tidak akan bisa mengirim/menerima pesan WhatsApp.
-              </p>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="api-url">API URL OneSender</Label>
-              <Input
-                id="api-url"
-                value={onesenderApiUrl}
-                onChange={(e) => setOnesenderApiUrl(e.target.value)}
-                placeholder="https://api.onesender.id/api/v1/message/send"
-              />
-              <p className="text-xs text-muted-foreground">
-                Format URL API endpoint untuk mengirim pesan
-              </p>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="api-key">API Key OneSender</Label>
-              <Input
-                id="api-key"
-                type="password"
-                value={onesenderApiKey}
-                onChange={(e) => setOnesenderApiKey(e.target.value)}
-                placeholder="Bearer token dari dashboard OneSender"
-              />
-              <p className="text-xs text-muted-foreground">
-                API Key / Bearer Token dari akun OneSender Anda
-              </p>
-            </div>
-            <Button onClick={saveSettings} disabled={loading} className="w-full">
-              <Save className="w-4 h-4 mr-2" />
-              {loading ? "Menyimpan..." : "Simpan Pengaturan OneSender"}
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* AI Configuration */}
-        <Card className="shadow-card">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Bot className="w-5 h-5" />
-              Konfigurasi AI
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="ai-vendor">AI Provider</Label>
-              <select
-                id="ai-vendor"
-                className="w-full px-3 py-2 text-sm border rounded-md bg-background"
-                value={aiVendor}
-                onChange={(e) => setAiVendor(e.target.value)}
-              >
-                <option value="gemini">Google Gemini</option>
-                <option value="openai">OpenAI</option>
-                <option value="openrouter">OpenRouter</option>
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="ai-api-key">AI API Key</Label>
-              <Input
-                id="ai-api-key"
-                type="password"
-                value={aiApiKey}
-                onChange={(e) => setAiApiKey(e.target.value)}
-                placeholder="Your AI API Key"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="ai-model">AI Model</Label>
-              <Input
-                id="ai-model"
-                value={aiModel}
-                onChange={(e) => setAiModel(e.target.value)}
-                placeholder={
-                  aiVendor === 'gemini' ? 'gemini-2.5-flash' :
-                  aiVendor === 'openai' ? 'gpt-4o-mini' :
-                  'auto'
-                }
-              />
-              <p className="text-xs text-muted-foreground">
-                {aiVendor === 'gemini' && 'Model: gemini-2.5-flash, gemini-2.5-pro'}
-                {aiVendor === 'openai' && 'Model: gpt-4o, gpt-4o-mini, gpt-4-turbo'}
-                {aiVendor === 'openrouter' && 'Model: auto atau model spesifik dari OpenRouter'}
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="system-prompt">System Prompt (AI Behavior)</Label>
-              <textarea
-                id="system-prompt"
-                className="w-full min-h-[120px] px-3 py-2 text-sm border rounded-md bg-background"
-                value={systemPrompt}
-                onChange={(e) => setSystemPrompt(e.target.value)}
-                placeholder="Anda adalah asisten AI yang membantu menjawab pertanyaan pelanggan dengan ramah dan profesional."
-              />
-              <p className="text-xs text-muted-foreground">
-                Tentukan perilaku dan karakter AI dalam menjawab pertanyaan pelanggan. 
-                Untuk melihat transparansi lengkap AI, kunjungi halaman <Link to="/ai-behavior" className="text-primary hover:underline">AI Behavior</Link>.
-              </p>
-            </div>
-
-            <Button onClick={saveSettings} disabled={loading} className="w-full">
-              <Save className="w-4 h-4 mr-2" />
-              {loading ? "Menyimpan..." : "Simpan Pengaturan AI"}
-            </Button>
-
-            <div className="rounded-lg border p-4 space-y-2">
-              <p className="text-sm font-medium">Fitur AI:</p>
-              <ul className="text-sm text-muted-foreground space-y-1">
-                <li>✓ Balasan otomatis cerdas ketika tidak ada trigger match</li>
-                <li>✓ Menggunakan Knowledge Base sebagai konteks</li>
-                <li>✓ Respons dalam bahasa Indonesia</li>
-                <li>✓ Support membaca gambar dan teks</li>
-              </ul>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Webhook Info */}
-        <Card className="shadow-card">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Webhook className="w-5 h-5" />
-              Konfigurasi Webhook
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <p className="text-sm font-medium mb-2">Webhook Endpoint:</p>
-              <div className="rounded-lg bg-muted p-4 relative">
-                <code className="text-xs block overflow-x-auto break-all pr-10">
-                  {`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/balasinaja?user_id=${user?.id || 'loading...'}`}
-                </code>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="absolute top-2 right-2"
-                  onClick={() => {
-                    navigator.clipboard.writeText(
-                      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/balasinaja?user_id=${user?.id}`
-                    );
-                    setCopied(true);
-                    toast({
-                      title: "Copied!",
-                      description: "Webhook URL berhasil disalin ke clipboard.",
-                    });
-                    setTimeout(() => setCopied(false), 2000);
-                  }}
-                >
-                  {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                </Button>
+          <Card>
+            <CardHeader>
+              <CardTitle>Informasi Bisnis</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="business_name">Nama Bisnis</Label>
+                <Input
+                  id="business_name"
+                  placeholder="Masukkan nama bisnis"
+                  value={businessName}
+                  onChange={(e) => setBusinessName(e.target.value)}
+                />
               </div>
-            </div>
-            <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
-              <p className="text-sm">
-                <strong>Cara menggunakan:</strong> Daftarkan URL webhook di atas ke OneSender dashboard Anda. 
-                Setiap pesan WhatsApp yang masuk akan dikirim ke endpoint ini untuk diproses.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+              <div className="space-y-2">
+                <Label htmlFor="whatsapp_business">No WhatsApp Bisnis</Label>
+                <Input
+                  id="whatsapp_business"
+                  placeholder="628123456789"
+                  value={whatsappNumber}
+                  onChange={(e) => setWhatsappNumber(e.target.value)}
+                />
+              </div>
+              <Button onClick={saveProfile} disabled={saving}>
+                {saving ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Menyimpan...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4 mr-2" />
+                    Simpan Profil
+                  </>
+                )}
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
       </ExpiredUserGuard>
     </Layout>
   );

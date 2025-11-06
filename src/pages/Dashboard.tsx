@@ -7,6 +7,7 @@ import { User } from "@supabase/supabase-js";
 import { SubscriptionInfo } from "@/components/SubscriptionInfo";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
 import { id as localeId } from "date-fns/locale";
+import logo from "@/assets/BalasinAja.png";
 
 export default function Dashboard() {
   const [user, setUser] = useState<User | null>(null);
@@ -180,11 +181,14 @@ export default function Dashboard() {
   return (
     <Layout>
       <div className="space-y-8 animate-fade-in">
-        <div>
-          <h1 className="text-4xl font-bold">Dashboard</h1>
-          <p className="text-muted-foreground mt-2">
-            Selamat datang di BalasinAja - Sistem autoreply WhatsApp AI
-          </p>
+        <div className="flex items-center gap-4">
+          <img src={logo} alt="BalasinAja" className="h-12 w-auto" />
+          <div>
+            <h1 className="text-4xl font-bold">Dashboard</h1>
+            <p className="text-muted-foreground mt-2">
+              Selamat datang di BalasinAja - Sistem autoreply WhatsApp AI
+            </p>
+          </div>
         </div>
 
         {/* Subscription Info Card */}

@@ -38,11 +38,27 @@ export default function UserManagement() {
   const [extendDays, setExtendDays] = useState<number>(30);
   const [selectedUserId, setSelectedUserId] = useState<string>("");
   const [selectedPackageId, setSelectedPackageId] = useState<string>("");
+  const [newUsersCount, setNewUsersCount] = useState(0);
   const { toast } = useToast();
 
   useEffect(() => {
     fetchUsers();
     fetchPackages();
+    
+    // Check for new users (created in last 24 hours)
+    const checkNewUsers = async () => {
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      
+      const { count } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', yesterday.toISOString());
+      
+      setNewUsersCount(count || 0);
+    };
+    
+    checkNewUsers();
   }, []);
 
   const fetchPackages = async () => {

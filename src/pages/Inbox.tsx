@@ -90,11 +90,15 @@ export default function Inbox() {
 
   const assignCategory = async (messageId: string, phone: string, categoryId: string) => {
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
+
       // First, check if contact exists
       const { data: existingContact } = await supabase
         .from("contacts")
         .select("id")
         .eq("phone", phone)
+        .eq("user_id", session.user.id)
         .maybeSingle();
 
       let contactId: string;
@@ -102,10 +106,14 @@ export default function Inbox() {
       if (existingContact) {
         contactId = existingContact.id;
       } else {
-        // Create new contact
+        // Create new contact with user_id
         const { data: newContact, error: contactError } = await supabase
           .from("contacts")
-          .insert({ phone, name: messages.find(m => m.id === messageId)?.name || null })
+          .insert({ 
+            phone, 
+            name: messages.find(m => m.id === messageId)?.name || null,
+            user_id: session.user.id
+          })
           .select("id")
           .single();
 
@@ -181,20 +189,6 @@ export default function Inbox() {
             </p>
           </div>
           <div className="flex gap-2">
-            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-              <SelectTrigger className="w-[200px]">
-                <Filter className="w-4 h-4 mr-2" />
-                <SelectValue placeholder="Filter Kategori" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Semua Kategori</SelectItem>
-                {categories.map((category) => (
-                  <SelectItem key={category.id} value={category.id}>
-                    {category.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
             <Button onClick={fetchMessages} disabled={loading}>
               <RefreshCw className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`} />
               Refresh

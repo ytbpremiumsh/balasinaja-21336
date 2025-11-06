@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { LogOut, Key, User } from "lucide-react";
+import { LogOut, Key, User, Settings } from "lucide-react";
 import { toast } from "sonner";
 import { ChangePasswordDialog } from "./ChangePasswordDialog";
 
@@ -94,6 +94,10 @@ export const UserAvatar = () => {
             </div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => navigate("/settings")}>
+            <Settings className="mr-2 h-4 w-4" />
+            <span>Settings</span>
+          </DropdownMenuItem>
           <DropdownMenuItem onClick={() => setShowPasswordDialog(true)}>
             <Key className="mr-2 h-4 w-4" />
             <span>Ubah Password</span>

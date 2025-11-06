@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { MessageSquare, Inbox, Bot, Users, Settings, Sparkles, Brain, Shield, UserCog, Package, ScrollText, CreditCard, Bell, Radio, BellDot, ChevronDown } from "lucide-react";
+import { MessageSquare, Inbox, Bot, Users, Sparkles, Brain, Shield, UserCog, Package, ScrollText, CreditCard, Bell, Radio, BellDot, ChevronDown, Settings2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
@@ -28,13 +28,13 @@ const broadcastNavigation = [
 ];
 
 const adminNavigation = [
-  { name: "Dashboard Admin", href: "/admin", icon: Shield },
-  { name: "Manajemen User", href: "/admin/users", icon: UserCog },
-  { name: "Manajemen Paket", href: "/admin/packages", icon: Package },
-  { name: "Verifikasi Pembayaran", href: "/admin/payments", icon: Bell },
-  { name: "Pengaturan Pembayaran", href: "/admin/payment-settings", icon: CreditCard },
-  { name: "Notifikasi WhatsApp", href: "/admin/whatsapp-notifications", icon: MessageSquare },
-  { name: "Log Aktivitas", href: "/admin/logs", icon: ScrollText },
+  { name: "Dashboard Admin", href: "/admin", icon: Shield, badge: 0 },
+  { name: "Manajemen User", href: "/admin/users", icon: UserCog, badge: 0 },
+  { name: "Manajemen Paket", href: "/admin/packages", icon: Package, badge: 0 },
+  { name: "Verifikasi Pembayaran", href: "/admin/payments", icon: Bell, badge: 0 },
+  { name: "Pengaturan Pembayaran", href: "/admin/payment-settings", icon: CreditCard, badge: 0 },
+  { name: "Notifikasi WhatsApp", href: "/admin/whatsapp-notifications", icon: MessageSquare, badge: 0 },
+  { name: "Log Aktivitas", href: "/admin/logs", icon: ScrollText, badge: 0 },
 ];
 
 export const Layout = ({ children }: { children: React.ReactNode }) => {
@@ -44,6 +44,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
   const [navigation, setNavigation] = useState(userNavigation);
   const [pendingPayments, setPendingPayments] = useState(0);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [newUsersCount, setNewUsersCount] = useState(0);
 
   useEffect(() => {
     const checkAdminRole = async () => {
@@ -63,8 +64,21 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
         
         // Set navigation based on role
         if (hasAdminRole) {
-          setNavigation([...adminNavigation, ...userNavigation]);
           fetchPendingPayments();
+          fetchNewUsers();
+          
+          // Update navigation with badges
+          const updatedAdminNav = adminNavigation.map(item => {
+            if (item.href === "/admin/users") {
+              return { ...item, badge: newUsersCount };
+            }
+            if (item.href === "/admin/payments") {
+              return { ...item, badge: pendingPayments };
+            }
+            return item;
+          });
+          
+          setNavigation([...updatedAdminNav, ...userNavigation]);
         } else {
           setNavigation(userNavigation);
         }
@@ -133,6 +147,18 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
     setUnreadNotifications(count || 0);
   };
 
+  const fetchNewUsers = async () => {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    const { count } = await supabase
+      .from('profiles')
+      .select('*', { count: 'exact', head: true })
+      .gte('created_at', yesterday.toISOString());
+    
+    setNewUsersCount(count || 0);
+  };
+
 
   return (
     <div className="min-h-screen bg-background">
@@ -162,16 +188,16 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
               Langganan
             </Link>
             <Link 
-              to="/settings"
+              to="/api-configuration"
               className={cn(
                 "flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors",
-                location.pathname === "/settings"
+                location.pathname === "/api-configuration"
                   ? "bg-primary text-primary-foreground"
                   : "text-muted-foreground hover:bg-muted hover:text-foreground"
               )}
             >
-              <Settings className="w-4 h-4" />
-              Settings
+              <Settings2 className="w-4 h-4" />
+              Konfigurasi API
             </Link>
             <Button
               variant="ghost"
@@ -195,9 +221,9 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
       <nav className="border-b border-border bg-card">
         <div className="container mx-auto px-4">
           <div className="flex gap-2 overflow-x-auto py-2">
-            {navigation.map((item) => {
+            {navigation.map((item: any) => {
               const isActive = location.pathname === item.href;
-              const isPendingPayments = item.href === "/admin/payments" && pendingPayments > 0;
+              const showBadge = item.badge && item.badge > 0;
               return (
                 <Link
                   key={item.name}
@@ -211,9 +237,9 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                 >
                   <item.icon className="w-4 h-4" />
                   {item.name}
-                  {isPendingPayments && (
+                  {showBadge && (
                     <Badge variant="destructive" className="ml-1 h-5 px-1.5 text-xs">
-                      {pendingPayments}
+                      {item.badge}
                     </Badge>
                   )}
                 </Link>

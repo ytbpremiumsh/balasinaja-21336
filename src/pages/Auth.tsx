@@ -7,7 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Lock, Mail, User, Phone } from "lucide-react";
+import { Mail, User, Phone, Lock } from "lucide-react";
+import logo from "@/assets/BalasinAja.png";
 
 export default function Auth() {
   const [email, setEmail] = useState("");
@@ -143,8 +144,8 @@ export default function Auth() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-primary/5 to-background p-4">
       <Card className="w-full max-w-md shadow-elegant">
         <CardHeader className="space-y-2 text-center">
-          <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-2">
-            <Lock className="w-6 h-6 text-primary" />
+          <div className="mx-auto mb-4">
+            <img src={logo} alt="BalasinAja" className="h-16 w-auto mx-auto" />
           </div>
           <CardTitle className="text-2xl">
             {isSignUp ? "Buat Akun Baru" : "Login ke BalasinAja"}

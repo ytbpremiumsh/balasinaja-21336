@@ -3,6 +3,7 @@ import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { Users, UserCheck, UserX, Clock, TrendingUp } from "lucide-react";
+import logo from "@/assets/BalasinAja.png";
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState({
@@ -92,11 +93,14 @@ export default function AdminDashboard() {
   return (
     <Layout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Dashboard Admin</h1>
-          <p className="text-muted-foreground">
-            Kelola user dan pantau statistik sistem BalasinAja
-          </p>
+        <div className="flex items-center gap-4">
+          <img src={logo} alt="BalasinAja" className="h-12 w-auto" />
+          <div>
+            <h1 className="text-3xl font-bold">Dashboard Admin</h1>
+            <p className="text-muted-foreground">
+              Kelola user dan pantau statistik sistem BalasinAja
+            </p>
+          </div>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

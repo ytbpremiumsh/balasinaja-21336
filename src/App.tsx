@@ -13,6 +13,8 @@ import Broadcast from "./pages/Broadcast";
 import BroadcastReport from "./pages/BroadcastReport";
 import Notifications from "./pages/Notifications";
 import Settings from "./pages/Settings";
+import Subscription from "./pages/Subscription";
+import APIConfiguration from "./pages/APIConfiguration";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import AdminDashboard from "./pages/admin/AdminDashboard";
@@ -22,7 +24,6 @@ import PaymentVerification from "./pages/admin/PaymentVerification";
 import PaymentSettings from "./pages/admin/PaymentSettings";
 import WhatsAppNotifications from "./pages/admin/WhatsAppNotifications";
 import ActivityLogs from "./pages/admin/ActivityLogs";
-import Subscription from "./pages/Subscription";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { AdminRoute } from "./components/AdminRoute";
 
@@ -46,6 +47,7 @@ const App = () => (
           <Route path="/broadcast-report" element={<ProtectedRoute><BroadcastReport /></ProtectedRoute>} />
           <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+          <Route path="/api-configuration" element={<ProtectedRoute><APIConfiguration /></ProtectedRoute>} />
           <Route path="/subscription" element={<ProtectedRoute><Subscription /></ProtectedRoute>} />
           
           {/* Admin Routes */}
