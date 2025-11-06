@@ -29,12 +29,12 @@ const broadcastNavigation = [
 
 const adminNavigation = [
   { name: "Dashboard Admin", href: "/admin", icon: Shield },
-  { name: "Manajemen User", href: "/admin/users", icon: UserCog},
-  { name: "Manajemen Paket", href: "/admin/packages", icon: Package},
-  { name: "Verifikasi Pembayaran", href: "/admin/payments", icon: Bell},
-  { name: "Pengaturan Pembayaran", href: "/admin/payment-settings", icon: CreditCard},
-  { name: "Notifikasi WhatsApp", href: "/admin/whatsapp-notifications", icon: MessageSquare},
-  { name: "Log Aktivitas", href: "/admin/logs", icon: ScrollText},
+  { name: "Manajemen User", href: "/admin/users", icon: UserCog },
+  { name: "Manajemen Paket", href: "/admin/packages", icon: Package },
+  { name: "Verifikasi Pembayaran", href: "/admin/payments", icon: Bell },
+  { name: "Pengaturan Pembayaran", href: "/admin/payment-settings", icon: CreditCard },
+  { name: "Notifikasi WhatsApp", href: "/admin/whatsapp-notifications", icon: MessageSquare },
+  { name: "Log Aktivitas", href: "/admin/logs", icon: ScrollText },
 ];
 
 export const Layout = ({ children }: { children: React.ReactNode }) => {
