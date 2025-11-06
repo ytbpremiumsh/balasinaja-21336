@@ -182,7 +182,6 @@ export default function Dashboard() {
     <Layout>
       <div className="space-y-8 animate-fade-in">
         <div className="flex items-center gap-4">
-          <img src={logo} alt="BalasinAja" className="h-12 w-auto" />
           <div>
             <h1 className="text-4xl font-bold">Dashboard</h1>
             <p className="text-muted-foreground mt-2">
