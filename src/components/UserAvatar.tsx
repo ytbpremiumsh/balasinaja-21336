@@ -10,9 +10,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { LogOut, Key, User, Settings } from "lucide-react";
+import { LogOut, Settings, Package, Settings2 } from "lucide-react";
 import { toast } from "sonner";
-import { ChangePasswordDialog } from "./ChangePasswordDialog";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface UserProfile {
   name: string | null;
@@ -21,8 +21,8 @@ interface UserProfile {
 
 export const UserAvatar = () => {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
 
   useEffect(() => {
     loadProfile();
@@ -94,13 +94,22 @@ export const UserAvatar = () => {
             </div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
+          {isMobile && (
+            <>
+              <DropdownMenuItem onClick={() => navigate("/subscription")}>
+                <Package className="mr-2 h-4 w-4" />
+                <span>Langganan</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate("/api-configuration")}>
+                <Settings2 className="mr-2 h-4 w-4" />
+                <span>Konfigurasi API</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+            </>
+          )}
           <DropdownMenuItem onClick={() => navigate("/settings")}>
             <Settings className="mr-2 h-4 w-4" />
             <span>Settings</span>
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => setShowPasswordDialog(true)}>
-            <Key className="mr-2 h-4 w-4" />
-            <span>Ubah Password</span>
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={handleLogout} className="text-destructive">
@@ -109,11 +118,6 @@ export const UserAvatar = () => {
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-
-      <ChangePasswordDialog
-        open={showPasswordDialog}
-        onOpenChange={setShowPasswordDialog}
-      />
     </>
   );
 };

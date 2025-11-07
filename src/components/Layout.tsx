@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { MessageSquare, Inbox, Bot, Users, Sparkles, Brain, Shield, UserCog, Package, ScrollText, CreditCard, Bell, Radio, BellDot, ChevronDown, Settings2 } from "lucide-react";
+import { MessageSquare, Inbox, Bot, Users, Sparkles, Brain, Shield, UserCog, Package, ScrollText, CreditCard, Bell, Radio, BellDot, ChevronDown, Settings2, LayoutDashboard } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { UserAvatar } from "./UserAvatar";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const userNavigation = [
   { name: "Dashboard", href: "/", icon: Sparkles },
@@ -40,7 +41,9 @@ const adminNavigation = [
 export const Layout = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const [isAdmin, setIsAdmin] = useState(false);
+  const [adminMode, setAdminMode] = useState<'admin' | 'user'>('admin');
   const [navigation, setNavigation] = useState(userNavigation);
   const [pendingPayments, setPendingPayments] = useState(0);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
@@ -62,25 +65,16 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
         const hasAdminRole = !!roles;
         setIsAdmin(hasAdminRole);
         
+        // Load saved mode preference
+        const savedMode = localStorage.getItem('adminMode') as 'admin' | 'user';
+        if (hasAdminRole && savedMode) {
+          setAdminMode(savedMode);
+        }
+        
         // Set navigation based on role
         if (hasAdminRole) {
           fetchPendingPayments();
           fetchNewUsers();
-          
-          // Update navigation with badges
-          const updatedAdminNav = adminNavigation.map(item => {
-            if (item.href === "/admin/users") {
-              return { ...item, badge: newUsersCount };
-            }
-            if (item.href === "/admin/payments") {
-              return { ...item, badge: pendingPayments };
-            }
-            return item;
-          });
-          
-          setNavigation([...updatedAdminNav, ...userNavigation]);
-        } else {
-          setNavigation(userNavigation);
         }
       } catch (error) {
         console.error('Error checking admin role:', error);
@@ -90,6 +84,19 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
     checkAdminRole();
     fetchUnreadNotifications();
   }, []);
+
+  // Update navigation when admin mode changes
+  useEffect(() => {
+    if (isAdmin) {
+      if (adminMode === 'admin') {
+        setNavigation(adminNavigation);
+      } else {
+        setNavigation([...userNavigation, ...broadcastNavigation]);
+      }
+    } else {
+      setNavigation([...userNavigation, ...broadcastNavigation]);
+    }
+  }, [isAdmin, adminMode]);
 
   useEffect(() => {
     const channels = [];
@@ -165,40 +172,76 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
-          <Link to="/" className="flex items-center gap-2 font-bold text-xl">
-            <div className="flex items-center justify-center w-10 h-10 rounded-lg gradient-primary">
-              <MessageSquare className="w-6 h-6 text-primary-foreground" />
-            </div>
-            <span className="bg-gradient-to-r from-primary to-primary-glow bg-clip-text text-transparent">
-              BalasinAja {isAdmin && <span className="text-sm text-muted-foreground">(Admin)</span>}
-            </span>
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link to="/" className="flex items-center gap-2 font-bold text-xl">
+              <div className="flex items-center justify-center w-10 h-10 rounded-lg gradient-primary">
+                <MessageSquare className="w-6 h-6 text-primary-foreground" />
+              </div>
+              <span className="bg-gradient-to-r from-primary to-primary-glow bg-clip-text text-transparent">
+                BalasinAja
+              </span>
+            </Link>
+            
+            {isAdmin && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-2">
+                    <LayoutDashboard className="w-4 h-4" />
+                    <span className="hidden sm:inline">
+                      {adminMode === 'admin' ? 'Mode Admin' : 'Mode User'}
+                    </span>
+                    <ChevronDown className="w-4 h-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  <DropdownMenuItem onClick={() => {
+                    setAdminMode('admin');
+                    localStorage.setItem('adminMode', 'admin');
+                  }}>
+                    <Shield className="w-4 h-4 mr-2" />
+                    Dashboard Admin
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => {
+                    setAdminMode('user');
+                    localStorage.setItem('adminMode', 'user');
+                  }}>
+                    <Users className="w-4 h-4 mr-2" />
+                    Dashboard User
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
           
           <div className="flex items-center gap-2">
-            <Link 
-              to="/subscription"
-              className={cn(
-                "flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors",
-                location.pathname === "/subscription"
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
-              )}
-            >
-              <Package className="w-4 h-4" />
-              Langganan
-            </Link>
-            <Link 
-              to="/api-configuration"
-              className={cn(
-                "flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors",
-                location.pathname === "/api-configuration"
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
-              )}
-            >
-              <Settings2 className="w-4 h-4" />
-              Konfigurasi API
-            </Link>
+            {!isMobile && (
+              <>
+                <Link 
+                  to="/subscription"
+                  className={cn(
+                    "flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors",
+                    location.pathname === "/subscription"
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  )}
+                >
+                  <Package className="w-4 h-4" />
+                  Langganan
+                </Link>
+                <Link 
+                  to="/api-configuration"
+                  className={cn(
+                    "flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors",
+                    location.pathname === "/api-configuration"
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  )}
+                >
+                  <Settings2 className="w-4 h-4" />
+                  Konfigurasi API
+                </Link>
+              </>
+            )}
             <Button
               variant="ghost"
               size="sm"
@@ -223,7 +266,9 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
           <div className="flex gap-2 overflow-x-auto py-2">
             {navigation.map((item: any) => {
               const isActive = location.pathname === item.href;
-              const showBadge = item.badge && item.badge > 0;
+              const showUserBadge = item.href === "/admin/users" && newUsersCount > 0;
+              const showPaymentBadge = item.href === "/admin/payments" && pendingPayments > 0;
+              
               return (
                 <Link
                   key={item.name}
@@ -237,46 +282,19 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                 >
                   <item.icon className="w-4 h-4" />
                   {item.name}
-                  {showBadge && (
+                  {showUserBadge && (
                     <Badge variant="destructive" className="ml-1 h-5 px-1.5 text-xs">
-                      {item.badge}
+                      {newUsersCount}
+                    </Badge>
+                  )}
+                  {showPaymentBadge && (
+                    <Badge variant="destructive" className="ml-1 h-5 px-1.5 text-xs">
+                      {pendingPayments}
                     </Badge>
                   )}
                 </Link>
               );
             })}
-            
-            {/* Broadcast Dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  className={cn(
-                    "flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all whitespace-nowrap",
-                    (location.pathname === "/broadcast" || location.pathname === "/broadcast-report")
-                      ? "bg-primary text-primary-foreground shadow-md"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                  )}
-                >
-                  <Radio className="w-4 h-4" />
-                  Broadcast
-                  <ChevronDown className="w-4 h-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                {broadcastNavigation.map((item) => (
-                  <DropdownMenuItem key={item.name} asChild>
-                    <Link
-                      to={item.href}
-                      className="flex items-center gap-2 w-full cursor-pointer"
-                    >
-                      <item.icon className="w-4 h-4" />
-                      {item.name}
-                    </Link>
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
           </div>
         </div>
       </nav>

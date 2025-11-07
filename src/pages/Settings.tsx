@@ -1,21 +1,24 @@
 import { useEffect, useState } from "react";
 import { Layout } from "@/components/Layout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Save, User } from "lucide-react";
+import { Loader2, Save, User as UserIcon, Key } from "lucide-react";
+import { ChangePasswordDialog } from "@/components/ChangePasswordDialog";
 import { ExpiredUserGuard } from "@/components/ExpiredUserGuard";
 
 export default function Settings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const { toast } = useToast();
 
   const [businessName, setBusinessName] = useState("");
   const [whatsappNumber, setWhatsappNumber] = useState("");
+  const [userId, setUserId] = useState("");
 
   useEffect(() => {
     loadProfile();
@@ -25,6 +28,8 @@ export default function Settings() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
+
+      setUserId(session.user.id);
 
       const { data, error } = await supabase
         .from("profiles")
@@ -96,7 +101,7 @@ export default function Settings() {
         <div className="space-y-6">
           <div>
             <h1 className="text-3xl font-bold flex items-center gap-2">
-              <User className="w-8 h-8" />
+              <UserIcon className="w-8 h-8" />
               Settings
             </h1>
             <p className="text-muted-foreground">
@@ -127,22 +132,45 @@ export default function Settings() {
                   onChange={(e) => setWhatsappNumber(e.target.value)}
                 />
               </div>
-              <Button onClick={saveProfile} disabled={saving}>
-                {saving ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Menyimpan...
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-4 h-4 mr-2" />
-                    Simpan Profil
-                  </>
-                )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Keamanan</CardTitle>
+              <CardDescription>
+                Kelola password dan keamanan akun Anda
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button onClick={() => setShowPasswordDialog(true)} variant="outline">
+                <Key className="w-4 h-4 mr-2" />
+                Ubah Password
               </Button>
             </CardContent>
           </Card>
+
+          <div className="flex justify-end">
+            <Button onClick={saveProfile} disabled={saving}>
+              {saving ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Menyimpan...
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 mr-2" />
+                  Simpan Perubahan
+                </>
+              )}
+            </Button>
+          </div>
         </div>
+
+        <ChangePasswordDialog
+          open={showPasswordDialog}
+          onOpenChange={setShowPasswordDialog}
+        />
       </ExpiredUserGuard>
     </Layout>
   );

@@ -162,8 +162,18 @@ serve(async (req) => {
       }
     }
 
-    // AI fallback for text and image messages
-    if (messageType === 'text' || messageType === 'image') {
+    // Check if AI reply is enabled
+    const { data: aiSettings } = await supabase
+      .from('settings')
+      .select('value')
+      .eq('user_id', userId)
+      .eq('key', 'ai_reply_enabled')
+      .single();
+
+    const aiReplyEnabled = aiSettings?.value !== 'false'; // Default to true if not set
+
+    // AI fallback for text and image messages (only if enabled)
+    if (aiReplyEnabled && (messageType === 'text' || messageType === 'image')) {
       console.log('🤖 Attempting AI reply...');
       
       // For image messages, get the image URL from payload

@@ -2,11 +2,10 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Layout } from "@/components/Layout";
 import { ExpiredUserGuard } from "@/components/ExpiredUserGuard";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Inbox as InboxIcon, RefreshCw, Filter, Tag } from "lucide-react";
+import { Inbox as InboxIcon, RefreshCw, Tag, Image, FileText, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import {
   DropdownMenu,
@@ -106,7 +105,7 @@ export default function Inbox() {
       if (existingContact) {
         contactId = existingContact.id;
       } else {
-        // Create new contact with user_id
+        // Create new contact
         const { data: newContact, error: contactError } = await supabase
           .from("contacts")
           .insert({ 
@@ -121,7 +120,7 @@ export default function Inbox() {
         contactId = newContact.id;
       }
 
-      // Check if contact already has this category
+      // Check category link
       const { data: existingCategoryLink } = await supabase
         .from("contact_categories")
         .select("id")
@@ -130,21 +129,17 @@ export default function Inbox() {
         .maybeSingle();
 
       if (!existingCategoryLink) {
-        // Add category to contact
-        const { error: linkError } = await supabase
-          .from("contact_categories")
-          .insert({ contact_id: contactId, category_id: categoryId });
-
-        if (linkError) throw linkError;
+        await supabase.from("contact_categories").insert({
+          contact_id: contactId,
+          category_id: categoryId,
+        });
       }
 
       // Update inbox message with category
-      const { error: inboxError } = await supabase
+      await supabase
         .from("inbox")
         .update({ category_id: categoryId })
         .eq("id", messageId);
-
-      if (inboxError) throw inboxError;
 
       toast({
         title: "Kategori ditambahkan!",
@@ -166,7 +161,7 @@ export default function Inbox() {
       case "replied_trigger":
         return <Badge className="bg-green-500 hover:bg-green-600 text-white">Trigger</Badge>;
       case "replied_ai":
-        return <Badge className="bg-primary">AI</Badge>;
+        return <Badge className="bg-primary text-white">AI</Badge>;
       case "no_reply":
         return <Badge variant="outline">No Reply</Badge>;
       default:
@@ -174,116 +169,152 @@ export default function Inbox() {
     }
   };
 
+  const getMessageTypeBadge = (message: Message) => {
+    const type = message.inbox_type || detectType(message.inbox_message);
+
+    switch (type) {
+      case "image":
+        return (
+          <Badge variant="outline" className="bg-blue-50 text-blue-700 flex items-center gap-1">
+            <Image className="w-3 h-3" /> Gambar
+          </Badge>
+        );
+      case "document":
+        return (
+          <Badge variant="outline" className="bg-amber-50 text-amber-700 flex items-center gap-1">
+            <FileText className="w-3 h-3" /> Dokumen
+          </Badge>
+        );
+      default:
+        return (
+          <Badge variant="outline" className="bg-gray-50 text-gray-700 flex items-center gap-1">
+            <MessageSquare className="w-3 h-3" /> Teks
+          </Badge>
+        );
+    }
+  };
+
+  const detectType = (content: string | null): string => {
+    if (!content) return "text";
+    const lower = content.toLowerCase();
+    if (lower.includes("https://") && (lower.endsWith(".jpg") || lower.endsWith(".png") || lower.endsWith(".jpeg")))
+      return "image";
+    if (lower.includes("https://") && (lower.endsWith(".pdf") || lower.endsWith(".doc") || lower.endsWith(".xls")))
+      return "document";
+    return "text";
+  };
+
   return (
     <Layout>
       <ExpiredUserGuard>
         <div className="space-y-6 animate-fade-in">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-4xl font-bold flex items-center gap-3">
-              <InboxIcon className="w-8 h-8 text-primary" />
-              Inbox
-            </h1>
-            <p className="text-muted-foreground mt-2">
-              Menampilkan 50 pesan terakhir yang diterima
-            </p>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h1 className="text-4xl font-bold flex items-center gap-3">
+                <InboxIcon className="w-8 h-8 text-primary" />
+                Inbox
+              </h1>
+              <p className="text-muted-foreground mt-2">
+                Menampilkan 50 pesan terakhir yang diterima
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={fetchMessages} disabled={loading}>
+                <RefreshCw className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`} />
+                Refresh
+              </Button>
+            </div>
           </div>
-          <div className="flex gap-2">
-            <Button onClick={fetchMessages} disabled={loading}>
-              <RefreshCw className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-              Refresh
-            </Button>
-          </div>
-        </div>
 
-        <div className="grid gap-4">
-          {messages.length === 0 ? (
-            <Card className="shadow-card">
-              <CardContent className="py-12 text-center text-muted-foreground">
-                Belum ada pesan masuk
-              </CardContent>
-            </Card>
-          ) : (
-            messages.map((message) => (
-              <Card key={message.id} className="shadow-card hover:shadow-lg transition-shadow">
-                <CardContent className="pt-6">
-                  <div className="space-y-3">
-                    <div className="flex items-start justify-between">
-                      <div className="space-y-1">
-                        <p className="text-sm text-muted-foreground">
-                          {new Date(message.created_at).toLocaleString("id-ID", {
-                            day: '2-digit',
-                            month: '2-digit',
-                            year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                        </p>
-                      </div>
-                      <div className="flex gap-2">
-                        {message.categories && (
-                          <Badge variant="outline" className="bg-primary/10">
-                            {message.categories.name}
-                          </Badge>
-                        )}
-                        {getStatusBadge(message.status)}
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button size="sm" variant="outline">
-                              <Tag className="w-4 h-4 mr-1" />
-                              Kategori
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="bg-background">
-                            <DropdownMenuLabel>Pilih Kategori</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            {categories.map((category) => (
-                              <DropdownMenuItem
-                                key={category.id}
-                                onClick={() => assignCategory(message.id, message.phone, category.id)}
-                              >
-                                {category.name}
-                              </DropdownMenuItem>
-                            ))}
-                            {categories.length === 0 && (
-                              <DropdownMenuItem disabled>
-                                Tidak ada kategori
-                              </DropdownMenuItem>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-1">
-                      <p className="text-sm font-medium text-muted-foreground">Nomor</p>
-                      <p className="font-mono font-medium">{message.phone}</p>
-                    </div>
-
-                    <div className="space-y-1">
-                      <p className="text-sm font-medium text-muted-foreground">Nama</p>
-                      <p className="font-medium">{message.name || "-"}</p>
-                    </div>
-
-                    <div className="space-y-1">
-                      <p className="text-sm font-medium text-muted-foreground">Pesan Masuk</p>
-                      <p className="text-sm bg-muted/50 p-3 rounded-md">
-                        {message.inbox_message || "-"}
-                      </p>
-                    </div>
-
-                    <div className="space-y-1">
-                      <p className="text-sm font-medium text-muted-foreground">Balasan</p>
-                      <p className="text-sm bg-primary/5 p-3 rounded-md">
-                        {message.reply_message || "-"}
-                      </p>
-                    </div>
-                  </div>
+          <div className="grid gap-4">
+            {messages.length === 0 ? (
+              <Card className="shadow-card">
+                <CardContent className="py-12 text-center text-muted-foreground">
+                  Belum ada pesan masuk
                 </CardContent>
               </Card>
-            ))
-          )}
-        </div>
+            ) : (
+              messages.map((message) => (
+                <Card key={message.id} className="shadow-card hover:shadow-lg transition-shadow">
+                  <CardContent className="pt-6">
+                    <div className="space-y-3">
+                      <div className="flex items-start justify-between">
+                        <div className="space-y-1">
+                          <p className="text-sm text-muted-foreground">
+                            {new Date(message.created_at).toLocaleString("id-ID", {
+                              day: "2-digit",
+                              month: "2-digit",
+                              year: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </p>
+                        </div>
+                        <div className="flex gap-2 flex-wrap justify-end">
+                          {getMessageTypeBadge(message)}
+                          {message.categories && (
+                            <Badge variant="outline" className="bg-primary/10">
+                              {message.categories.name}
+                            </Badge>
+                          )}
+                          {getStatusBadge(message.status)}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button size="sm" variant="outline">
+                                <Tag className="w-4 h-4 mr-1" />
+                                Kategori
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="bg-background">
+                              <DropdownMenuLabel>Pilih Kategori</DropdownMenuLabel>
+                              <DropdownMenuSeparator />
+                              {categories.map((category) => (
+                                <DropdownMenuItem
+                                  key={category.id}
+                                  onClick={() => assignCategory(message.id, message.phone, category.id)}
+                                >
+                                  {category.name}
+                                </DropdownMenuItem>
+                              ))}
+                              {categories.length === 0 && (
+                                <DropdownMenuItem disabled>
+                                  Tidak ada kategori
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium text-muted-foreground">Nomor</p>
+                        <p className="font-mono font-medium">{message.phone}</p>
+                      </div>
+
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium text-muted-foreground">Nama</p>
+                        <p className="font-medium">{message.name || "-"}</p>
+                      </div>
+
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium text-muted-foreground">Pesan Masuk</p>
+                        <p className="text-sm bg-muted/50 p-3 rounded-md">
+                          {message.inbox_message || "-"}
+                        </p>
+                      </div>
+
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium text-muted-foreground">Balasan</p>
+                        <p className="text-sm bg-primary/5 p-3 rounded-md">
+                          {message.reply_message || "-"}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </div>
         </div>
       </ExpiredUserGuard>
     </Layout>

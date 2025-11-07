@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react";
 import { Layout } from "@/components/Layout";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,52 +14,47 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Save, Settings } from "lucide-react";
-
-type Setting = {
-  key: string;
-  value: string;
-};
+import { Loader2, Save, Settings, Copy, Check, Bot } from "lucide-react";
 
 export default function APIConfiguration() {
-  const [settings, setSettings] = useState<Setting[]>([]);
+  const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [copied, setCopied] = useState(false);
   const { toast } = useToast();
 
   const [onesenderApiUrl, setOnesenderApiUrl] = useState("");
   const [onesenderApiKey, setOnesenderApiKey] = useState("");
-  const [aiVendor, setAiVendor] = useState("lovable");
+  const [aiVendor, setAiVendor] = useState("openrouter");
   const [aiApiKey, setAiApiKey] = useState("");
-  const [aiModel, setAiModel] = useState("google/gemini-2.5-flash");
+  const [aiModel, setAiModel] = useState("");
   const [systemPrompt, setSystemPrompt] = useState("");
+  const [aiReplyEnabled, setAiReplyEnabled] = useState(true);
 
   useEffect(() => {
-    loadSettings();
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      loadSettings();
+    });
   }, []);
 
   const loadSettings = async () => {
     try {
-      const { data, error } = await supabase
-        .from("settings")
-        .select("*");
-
+      const { data, error } = await supabase.from("settings").select("*");
       if (error) throw error;
 
-      const settingsMap = data.reduce((acc: any, setting: Setting) => {
-        acc[setting.key] = setting.value;
-        return acc;
-      }, {});
+      const map: Record<string, string> = {};
+      data.forEach((item) => (map[item.key] = item.value));
 
-      setOnesenderApiUrl(settingsMap.onesender_api_url || "");
-      setOnesenderApiKey(settingsMap.onesender_api_key || "");
-      setAiVendor(settingsMap.ai_vendor || "lovable");
-      setAiApiKey(settingsMap.ai_api_key || "");
-      setAiModel(settingsMap.ai_model || "google/gemini-2.5-flash");
-      setSystemPrompt(settingsMap.system_prompt || "");
-      setSettings(data);
-    } catch (error) {
-      console.error("Error loading settings:", error);
+      setOnesenderApiUrl(map.onesender_api_url || "");
+      setOnesenderApiKey(map.onesender_api_key || "");
+      setAiVendor(map.ai_vendor || "openrouter");
+      setAiApiKey(map.ai_api_key || "");
+      setAiModel(map.ai_model || "");
+      setSystemPrompt(map.system_prompt || "");
+      setAiReplyEnabled(map.ai_reply_enabled === "true");
+    } catch (err) {
+      console.error("Error loading settings:", err);
       toast({
         title: "Error",
         description: "Gagal memuat pengaturan",
@@ -77,18 +78,20 @@ export default function APIConfiguration() {
         { key: "ai_api_key", value: aiApiKey },
         { key: "ai_model", value: aiModel },
         { key: "system_prompt", value: systemPrompt },
+        { key: "ai_reply_enabled", value: aiReplyEnabled ? "true" : "false" },
       ];
 
-      for (const setting of settingsToUpdate) {
+      for (const s of settingsToUpdate) {
         const { error } = await supabase
           .from("settings")
-          .upsert({
-            user_id: session.user.id,
-            key: setting.key,
-            value: setting.value,
-          }, {
-            onConflict: 'user_id,key'
-          });
+          .upsert(
+            {
+              user_id: session.user.id,
+              key: s.key,
+              value: s.value,
+            },
+            { onConflict: "user_id,key" }
+          );
 
         if (error) throw error;
       }
@@ -97,8 +100,8 @@ export default function APIConfiguration() {
         title: "Berhasil",
         description: "Pengaturan API berhasil disimpan",
       });
-    } catch (error) {
-      console.error("Error saving settings:", error);
+    } catch (err) {
+      console.error("Error saving settings:", err);
       toast({
         title: "Error",
         description: "Gagal menyimpan pengaturan",
@@ -107,6 +110,14 @@ export default function APIConfiguration() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/balasinaja?user_id=${user?.id || "YOUR_USER_ID"}`;
+
+  const copyWebhook = () => {
+    navigator.clipboard.writeText(webhookUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   if (loading) {
@@ -121,146 +132,153 @@ export default function APIConfiguration() {
 
   return (
     <Layout>
-      <div className="space-y-6">
+      <div className="space-y-8">
+        {/* HEADER */}
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Settings className="w-8 h-8" />
-            Konfigurasi API & AI
+            <Settings className="w-7 h-7" />
+            Konfigurasi API
           </h1>
           <p className="text-muted-foreground">
-            Kelola integrasi API OneSender dan AI
+            Kelola integrasi WhatsApp Gateway dan AI Anda
           </p>
         </div>
 
+        {/* WEBHOOK URL */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Webhook Anda</CardTitle>
+            <CardDescription>
+              Setiap user memiliki URL webhook unik untuk menerima pesan dari OneSender / WA Gateway.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="rounded-lg bg-muted p-4 flex items-center gap-2">
+              <code className="text-xs bg-background rounded px-3 py-2 flex-1 overflow-x-auto break-all">
+                {webhookUrl}
+              </code>
+              <Button variant="outline" size="icon" onClick={copyWebhook}>
+                {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Gunakan URL ini di dashboard OneSender Anda. Sistem akan otomatis memproses pesan sesuai user ID Anda.
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* ONESENDER CONFIG */}
         <Card>
           <CardHeader>
             <CardTitle>OneSender API</CardTitle>
-            <CardDescription>
-              Konfigurasi koneksi ke OneSender untuk mengirim pesan WhatsApp
-            </CardDescription>
+            <CardDescription>Masukkan kredensial API dari OneSender</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3">
             <div className="space-y-2">
-              <Label htmlFor="onesender_url">OneSender API URL</Label>
+              <Label>OneSender API URL</Label>
               <Input
-                id="onesender_url"
-                placeholder="https://api.onesender.id"
                 value={onesenderApiUrl}
                 onChange={(e) => setOnesenderApiUrl(e.target.value)}
+                placeholder="https://api.onesender.id"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="onesender_key">OneSender API Key</Label>
+              <Label>OneSender API Key</Label>
               <Input
-                id="onesender_key"
                 type="password"
-                placeholder="Masukkan API key OneSender"
                 value={onesenderApiKey}
                 onChange={(e) => setOnesenderApiKey(e.target.value)}
+                placeholder="Masukkan API key"
               />
             </div>
           </CardContent>
         </Card>
 
+        {/* AI CONFIG */}
         <Card>
           <CardHeader>
             <CardTitle>AI Configuration</CardTitle>
-            <CardDescription>
-              Konfigurasi vendor AI dan model yang digunakan
-            </CardDescription>
+            <CardDescription>Konfigurasi vendor & model AI yang digunakan</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="ai_vendor">AI Vendor</Label>
-              <Select value={aiVendor} onValueChange={setAiVendor}>
-                <SelectTrigger id="ai_vendor">
-                  <SelectValue placeholder="Pilih vendor AI" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="lovable">Lovable AI</SelectItem>
-                  <SelectItem value="openai">OpenAI</SelectItem>
-                  <SelectItem value="anthropic">Anthropic</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {aiVendor !== "lovable" && (
-              <div className="space-y-2">
-                <Label htmlFor="ai_key">AI API Key</Label>
-                <Input
-                  id="ai_key"
-                  type="password"
-                  placeholder="Masukkan API key AI"
-                  value={aiApiKey}
-                  onChange={(e) => setAiApiKey(e.target.value)}
-                />
+          <CardContent className="space-y-3">
+            
+            {/* TOGGLE DALAM CARD */}
+            <div
+              className={`p-4 rounded-lg border flex items-center justify-between transition ${
+                aiReplyEnabled ? "border-green-500 bg-green-50" : "border-muted bg-muted/30"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <Bot className={`w-6 h-6 ${aiReplyEnabled ? "text-green-600" : "text-muted-foreground"}`} />
+                <div>
+                  <p className="font-medium">Balasan Otomatis AI</p>
+                  <p className="text-sm text-muted-foreground">
+                    Status:{" "}
+                    <span className={`font-semibold ${aiReplyEnabled ? "text-green-600" : "text-red-500"}`}>
+                      {aiReplyEnabled ? "Aktif" : "Nonaktif"}
+                    </span>
+                  </p>
+                </div>
               </div>
-            )}
+              <Button
+                variant={aiReplyEnabled ? "destructive" : "default"}
+                onClick={() => setAiReplyEnabled(!aiReplyEnabled)}
+              >
+                {aiReplyEnabled ? "Nonaktifkan" : "Aktifkan"}
+              </Button>
+            </div>
 
             <div className="space-y-2">
-              <Label htmlFor="ai_model">AI Model</Label>
-              <Select value={aiModel} onValueChange={setAiModel}>
-                <SelectTrigger id="ai_model">
-                  <SelectValue placeholder="Pilih model AI" />
+              <Label>AI Vendor</Label>
+              <Select value={aiVendor} onValueChange={setAiVendor}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih vendor" />
                 </SelectTrigger>
                 <SelectContent>
-                  {aiVendor === "lovable" && (
-                    <>
-                      <SelectItem value="google/gemini-2.5-flash">Gemini 2.5 Flash</SelectItem>
-                      <SelectItem value="google/gemini-2.5-flash-lite">Gemini 2.5 Flash Lite</SelectItem>
-                      <SelectItem value="google/gemini-2.5-pro">Gemini 2.5 Pro</SelectItem>
-                      <SelectItem value="openai/gpt-5-nano">GPT-5 Nano</SelectItem>
-                      <SelectItem value="openai/gpt-5-mini">GPT-5 Mini</SelectItem>
-                      <SelectItem value="openai/gpt-5">GPT-5</SelectItem>
-                    </>
-                  )}
-                  {aiVendor === "openai" && (
-                    <>
-                      <SelectItem value="gpt-4">GPT-4</SelectItem>
-                      <SelectItem value="gpt-4-turbo">GPT-4 Turbo</SelectItem>
-                      <SelectItem value="gpt-3.5-turbo">GPT-3.5 Turbo</SelectItem>
-                    </>
-                  )}
-                  {aiVendor === "anthropic" && (
-                    <>
-                      <SelectItem value="claude-3-opus">Claude 3 Opus</SelectItem>
-                      <SelectItem value="claude-3-sonnet">Claude 3 Sonnet</SelectItem>
-                      <SelectItem value="claude-3-haiku">Claude 3 Haiku</SelectItem>
-                    </>
-                  )}
+                  <SelectItem value="openrouter">OpenRouter</SelectItem>
+                  <SelectItem value="openai">OpenAI</SelectItem>
+                  <SelectItem value="gemini">Gemini</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="system_prompt">System Prompt</Label>
+              <Label>AI API Key</Label>
+              <Input
+                type="password"
+                value={aiApiKey}
+                onChange={(e) => setAiApiKey(e.target.value)}
+                placeholder="Masukkan API key AI"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Model</Label>
+              <Input
+                value={aiModel}
+                onChange={(e) => setAiModel(e.target.value)}
+                placeholder="cth: gpt-4-turbo"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>System Prompt</Label>
               <Textarea
-                id="system_prompt"
-                placeholder="Masukkan system prompt untuk AI"
+                rows={4}
                 value={systemPrompt}
                 onChange={(e) => setSystemPrompt(e.target.value)}
-                rows={6}
+                placeholder="Tulis prompt dasar untuk AI"
               />
-              <p className="text-xs text-muted-foreground">
-                System prompt menentukan perilaku dan karakter AI saat membalas pesan
-              </p>
             </div>
           </CardContent>
         </Card>
 
+        {/* SAVE BUTTON */}
         <div className="flex justify-end">
           <Button onClick={saveSettings} disabled={saving}>
-            {saving ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Menyimpan...
-              </>
-            ) : (
-              <>
-                <Save className="w-4 h-4 mr-2" />
-                Simpan Pengaturan
-              </>
-            )}
+            {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+            <Save className="w-4 h-4 mr-2" />
+            Simpan Pengaturan
           </Button>
         </div>
       </div>

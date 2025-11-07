@@ -185,6 +185,14 @@ const handler = async (req: Request): Promise<Response> => {
           priority: 10
         };
 
+        // Determine API endpoint based on media type
+        let apiEndpoint = apiUrl;
+        
+        // For image broadcasts, use the media endpoint
+        if (media_type === "image") {
+          apiEndpoint = apiUrl.replace("/api/v1/message/send", "/api/v1/media");
+        }
+
         // Format message based on type for OneSender
         if (media_type === "text") {
           requestBody.text = {
@@ -209,12 +217,12 @@ const handler = async (req: Request): Promise<Response> => {
         }
 
         console.log("📤 Sending to OneSender API:", { 
-          url: apiUrl, 
+          url: apiEndpoint, 
           phone: recipient.phone,
           messageType: media_type
         });
 
-        const response = await fetch(apiUrl, {
+        const response = await fetch(apiEndpoint, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -234,16 +242,23 @@ const handler = async (req: Request): Promise<Response> => {
             .eq("id", queueItem.id);
           console.log(`✅ Message sent to ${recipient.phone}`);
         } else {
-          failCount++;
           const errorText = await response.text();
+          const isWhatsAppError = errorText.includes('not registered') || 
+                                  errorText.includes('not a whatsapp') || 
+                                  response.status === 404 ||
+                                  response.status === 400;
+          
+          failCount++;
           await supabase
             .from("broadcast_queue")
             .update({ 
               status: "failed",
-              error_message: errorText,
+              error_message: isWhatsAppError 
+                ? 'Nomor tidak terdaftar di WhatsApp' 
+                : errorText,
             })
             .eq("id", queueItem.id);
-          console.error(`❌ Failed to send to ${recipient.phone}:`, errorText);
+          console.error(`❌ Failed to send to ${recipient.phone}:`, response.status, errorText);
         }
       } catch (error) {
         failCount++;

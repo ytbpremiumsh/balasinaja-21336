@@ -7,10 +7,15 @@ import { User } from "@supabase/supabase-js";
 import { SubscriptionInfo } from "@/components/SubscriptionInfo";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
 import { id as localeId } from "date-fns/locale";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
 import logo from "@/assets/BalasinAja.png";
 
 export default function Dashboard() {
   const [user, setUser] = useState<User | null>(null);
+  const [aiReplyEnabled, setAiReplyEnabled] = useState(true);
+  const { toast } = useToast();
   const [stats, setStats] = useState({
     totalMessages: 0,
     triggeredReplies: 0,
@@ -30,8 +35,58 @@ export default function Dashboard() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
+      if (session?.user) {
+        loadAiReplyStatus();
+      }
     });
   }, []);
+
+  const loadAiReplyStatus = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("settings")
+        .select("value")
+        .eq("key", "ai_reply_enabled")
+        .single();
+
+      if (error && error.code !== 'PGRST116') throw error;
+      setAiReplyEnabled(data?.value === 'true');
+    } catch (error) {
+      console.error("Error loading AI reply status:", error);
+    }
+  };
+
+  const toggleAiReply = async (enabled: boolean) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
+
+      const { error } = await supabase
+        .from("settings")
+        .upsert({
+          user_id: session.user.id,
+          key: "ai_reply_enabled",
+          value: enabled ? 'true' : 'false',
+        }, {
+          onConflict: 'user_id,key'
+        });
+
+      if (error) throw error;
+
+      setAiReplyEnabled(enabled);
+      toast({
+        title: "Berhasil",
+        description: `AI reply ${enabled ? 'diaktifkan' : 'dinonaktifkan'}`,
+      });
+    } catch (error) {
+      console.error("Error toggling AI reply:", error);
+      toast({
+        title: "Error",
+        description: "Gagal mengubah status AI reply",
+        variant: "destructive",
+      });
+    }
+  };
 
   useEffect(() => {
     fetchStats();
@@ -192,6 +247,32 @@ export default function Dashboard() {
 
         {/* Subscription Info Card */}
         <SubscriptionInfo />
+
+        {/* AI Reply Toggle Card */}
+        <Card className="shadow-card border-l-4 border-l-purple-500">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="rounded-xl p-3 bg-gradient-to-br from-purple-500 to-purple-600">
+                  <Bot className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <Label htmlFor="ai-reply-toggle" className="text-base font-semibold cursor-pointer">
+                    AI Reply Status
+                  </Label>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {aiReplyEnabled ? 'AI aktif membalas pesan' : 'AI dinonaktifkan'}
+                  </p>
+                </div>
+              </div>
+              <Switch
+                id="ai-reply-toggle"
+                checked={aiReplyEnabled}
+                onCheckedChange={toggleAiReply}
+              />
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Response Rate Card - Full Width */}
         <Card className="gradient-card shadow-card border-0 bg-gradient-to-br from-cyan-500/10 via-blue-500/10 to-purple-500/10">

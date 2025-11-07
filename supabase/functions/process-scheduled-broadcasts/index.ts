@@ -18,14 +18,18 @@ serve(async (req) => {
     );
 
     console.log('🕐 Processing scheduled broadcasts...');
+    
+    const now = new Date();
+    console.log('Current time (UTC):', now.toISOString());
+    console.log('Current time (local):', now.toString());
 
-    // Get all pending broadcast queue items that are scheduled for now or past
+    // Get all broadcast queue items that need to be sent
+    // This includes both scheduled items and pending items (from "Kirim Sekarang")
     const { data: queueItems, error: queueError } = await supabase
       .from('broadcast_queue')
       .select('*')
-      .eq('status', 'pending')
-      .not('scheduled_at', 'is', null)
-      .lte('scheduled_at', new Date().toISOString())
+      .in('status', ['scheduled', 'pending'])
+      .or(`scheduled_at.is.null,scheduled_at.lte.${now.toISOString()}`)
       .limit(100);
 
     if (queueError) {
@@ -34,7 +38,7 @@ serve(async (req) => {
     }
 
     if (!queueItems || queueItems.length === 0) {
-      console.log('✅ No scheduled broadcasts to process');
+      console.log('✅ No scheduled broadcasts to process at this time');
       return new Response(
         JSON.stringify({ message: 'No scheduled broadcasts to process', processed: 0 }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -42,6 +46,11 @@ serve(async (req) => {
     }
 
     console.log(`📋 Found ${queueItems.length} scheduled messages to send`);
+    
+    // Log scheduled times for debugging
+    queueItems.forEach(item => {
+      console.log(`Queue item ${item.id}: scheduled for ${item.scheduled_at}`);
+    });
 
     let successCount = 0;
     let failCount = 0;
@@ -119,6 +128,14 @@ serve(async (req) => {
           priority: 10
         };
 
+        // Determine API endpoint based on media type
+        let apiEndpoint = apiUrl;
+        
+        // For image broadcasts, use the media endpoint
+        if (payload.type === 'image') {
+          apiEndpoint = apiUrl.replace("/api/v1/message/send", "/api/v1/media");
+        }
+
         if (payload.type === 'text') {
           payload.text = { body: item.message };
         } else if (payload.type === 'image') {
@@ -129,7 +146,7 @@ serve(async (req) => {
 
         console.log(`📤 Sending to ${item.phone}...`);
 
-        const response = await fetch(apiUrl, {
+        const response = await fetch(apiEndpoint, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${apiKey}`,
@@ -139,7 +156,9 @@ serve(async (req) => {
         });
 
         if (response.ok) {
-          console.log(`✅ Message sent to ${item.phone}`);
+          const responseData = await response.json();
+          console.log(`✅ Message sent to ${item.phone}`, responseData);
+          
           await supabase
             .from('broadcast_queue')
             .update({
@@ -148,36 +167,87 @@ serve(async (req) => {
             })
             .eq('id', item.id);
           
-          // Update broadcast log counters
-          await supabase.rpc('increment', {
-            row_id: item.broadcast_log_id,
-            x: 1
-          });
+          // Update broadcast log counters and check if all sent
+          const { data: currentLog } = await supabase
+            .from('broadcast_logs')
+            .select('total_sent, total_recipients, total_failed, status')
+            .eq('id', item.broadcast_log_id)
+            .single();
+          
+          if (currentLog) {
+            const newTotalSent = (currentLog.total_sent || 0) + 1;
+            const totalProcessed = newTotalSent + (currentLog.total_failed || 0);
+            const updateData: any = {
+              total_sent: newTotalSent
+            };
+            
+            // If all messages processed, update status to completed
+            if (totalProcessed >= currentLog.total_recipients) {
+              updateData.status = 'completed';
+            }
+            
+            await supabase
+              .from('broadcast_logs')
+              .update(updateData)
+              .eq('id', item.broadcast_log_id);
+          }
 
           successCount++;
         } else {
           const errorText = await response.text();
-          console.error(`❌ Failed to send to ${item.phone}:`, errorText);
+          console.error(`❌ Failed to send to ${item.phone}:`, response.status, errorText);
           
           const retryCount = (item.retry_count || 0) + 1;
+          const isWhatsAppError = errorText.includes('not registered') || 
+                                  errorText.includes('not a whatsapp') || 
+                                  response.status === 404 ||
+                                  response.status === 400;
           
-          if (retryCount < 3) {
-            // Retry later
+          // If it's a WhatsApp registration error or max retries reached, mark as failed immediately
+          if (isWhatsAppError || retryCount >= 3) {
+            await supabase
+              .from('broadcast_queue')
+              .update({
+                status: 'failed',
+                error_message: isWhatsAppError 
+                  ? 'Nomor tidak terdaftar di WhatsApp' 
+                  : `Max retries reached: ${errorText}`,
+                retry_count: retryCount
+              })
+              .eq('id', item.id);
+            
+            // Update broadcast log failed count and check if all processed
+            const { data: currentLog } = await supabase
+              .from('broadcast_logs')
+              .select('total_failed, total_sent, total_recipients, status')
+              .eq('id', item.broadcast_log_id)
+              .single();
+            
+            if (currentLog) {
+              const newTotalFailed = (currentLog.total_failed || 0) + 1;
+              const totalProcessed = newTotalFailed + (currentLog.total_sent || 0);
+              const updateData: any = {
+                total_failed: newTotalFailed
+              };
+              
+              // If all messages processed, update status to completed
+              if (totalProcessed >= currentLog.total_recipients) {
+                updateData.status = 'completed';
+              }
+              
+              await supabase
+                .from('broadcast_logs')
+                .update(updateData)
+                .eq('id', item.broadcast_log_id);
+            }
+          } else {
+            // Retry later for temporary errors
             await supabase
               .from('broadcast_queue')
               .update({
                 retry_count: retryCount,
                 scheduled_at: new Date(Date.now() + 300000).toISOString(), // Retry in 5 minutes
-                error_message: errorText
-              })
-              .eq('id', item.id);
-          } else {
-            // Max retries reached, mark as failed
-            await supabase
-              .from('broadcast_queue')
-              .update({
-                status: 'failed',
-                error_message: `Max retries reached: ${errorText}`
+                error_message: `Retry ${retryCount}/3: ${errorText}`
               })
               .eq('id', item.id);
           }
@@ -194,9 +264,35 @@ serve(async (req) => {
           .from('broadcast_queue')
           .update({
             status: 'failed',
-            error_message: error.message
+            error_message: error.message || 'Network error'
           })
           .eq('id', item.id);
+        
+        // Update broadcast log failed count
+        const { data: currentLog } = await supabase
+          .from('broadcast_logs')
+          .select('total_failed, total_sent, total_recipients')
+          .eq('id', item.broadcast_log_id)
+          .single();
+        
+        if (currentLog) {
+          const newTotalFailed = (currentLog.total_failed || 0) + 1;
+          const totalProcessed = newTotalFailed + (currentLog.total_sent || 0);
+          const updateData: any = {
+            total_failed: newTotalFailed
+          };
+          
+          // If all messages processed, update status to completed
+          if (totalProcessed >= currentLog.total_recipients) {
+            updateData.status = 'completed';
+          }
+          
+          await supabase
+            .from('broadcast_logs')
+            .update(updateData)
+            .eq('id', item.broadcast_log_id);
+        }
+        
         failCount++;
       }
     }

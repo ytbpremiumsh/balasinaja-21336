@@ -60,47 +60,37 @@ serve(async (req) => {
       .select('user_id')
       .eq('role', 'admin')
       .limit(1)
-      .maybeSingle();
+      .single();
+
+    if (!adminRole) {
+      console.error('No admin user found');
+      return new Response(
+        JSON.stringify({ error: 'Admin not configured' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const adminUserId = adminRole.user_id;
+    console.log('Using admin user ID:', adminUserId);
+
+    // Get API settings from admin's settings
+    const { data: settings } = await supabaseClient
+      .from('settings')
+      .select('key, value')
+      .eq('user_id', adminUserId)
+      .in('key', ['onesender_api_url', 'onesender_api_key']);
 
     let apiUrl = '';
     let apiKey = '';
 
-    if (adminRole) {
-      const adminUserId = adminRole.user_id;
-      console.log('Using admin user ID:', adminUserId);
+    settings?.forEach(setting => {
+      if (setting.key === 'onesender_api_url') apiUrl = setting.value;
+      if (setting.key === 'onesender_api_key') apiKey = setting.value;
+    });
 
-      // Get API settings from admin's settings
-      const { data: settings } = await supabaseClient
-        .from('settings')
-        .select('key, value')
-        .eq('user_id', adminUserId)
-        .in('key', ['onesender_api_url', 'onesender_api_key']);
-
-      settings?.forEach(setting => {
-        if (setting.key === 'onesender_api_url') apiUrl = setting.value;
-        if (setting.key === 'onesender_api_key') apiKey = setting.value;
-      });
-    } else {
-      console.log('No admin user found, trying to get settings from any user...');
-      // Fallback to any user's settings
-      const { data: settings } = await supabaseClient
-        .from('settings')
-        .select('key, value')
-        .in('key', ['onesender_api_url', 'onesender_api_key'])
-        .limit(2);
-
-      settings?.forEach(setting => {
-        if (!apiUrl && setting.key === 'onesender_api_url') apiUrl = setting.value;
-        if (!apiKey && setting.key === 'onesender_api_key') apiKey = setting.value;
-      });
-    }
-
-    // Fallback to environment variables if not set
+    // Fallback to global API key if not set
     if (!apiKey) {
       apiKey = Deno.env.get('ONESENDER_API_KEY') || '';
-    }
-    if (!apiUrl) {
-      apiUrl = Deno.env.get('ONESENDER_API_URL') || '';
     }
 
     if (!apiUrl || !apiKey) {
