@@ -68,6 +68,44 @@ export default function Subscription() {
     }
   };
 
+  const handleMayarPayment = async () => {
+    if (!selectedPackage) {
+      toast({
+        title: "Error",
+        description: "Pilih paket terlebih dahulu",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Tidak terautentikasi");
+
+      const { data, error } = await supabase.functions.invoke('mayar-checkout', {
+        body: { package_id: selectedPackage }
+      });
+
+      if (error) throw error;
+
+      if (data?.checkout_url) {
+        window.location.href = data.checkout_url;
+      } else {
+        throw new Error("Checkout URL tidak ditemukan");
+      }
+
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+      setLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -238,12 +276,36 @@ export default function Subscription() {
               </Card>
             )}
 
+            {/* Quick Payment with Mayar */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CreditCard className="w-5 h-5" />
+                  Bayar Otomatis
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Bayar langsung dengan sistem pembayaran otomatis Mayar. Setelah pembayaran berhasil, langganan Anda akan langsung diperpanjang.
+                  </p>
+                  <Button 
+                    onClick={handleMayarPayment} 
+                    className="w-full" 
+                    disabled={loading || !selectedPackage}
+                  >
+                    {loading ? "Memproses..." : "Bayar Sekarang dengan Mayar"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Upload Payment Proof */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Upload className="w-5 h-5" />
-                  Upload Bukti Pembayaran
+                  Upload Bukti Pembayaran Manual
                 </CardTitle>
               </CardHeader>
               <CardContent>

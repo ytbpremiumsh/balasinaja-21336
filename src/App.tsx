@@ -14,6 +14,7 @@ import BroadcastReport from "./pages/BroadcastReport";
 import Notifications from "./pages/Notifications";
 import Settings from "./pages/Settings";
 import Subscription from "./pages/Subscription";
+import PaymentSuccess from "./pages/PaymentSuccess";
 import APIConfiguration from "./pages/APIConfiguration";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
@@ -49,6 +50,7 @@ const App = () => (
           <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
           <Route path="/api-configuration" element={<ProtectedRoute><APIConfiguration /></ProtectedRoute>} />
           <Route path="/subscription" element={<ProtectedRoute><Subscription /></ProtectedRoute>} />
+          <Route path="/payment-success" element={<ProtectedRoute><PaymentSuccess /></ProtectedRoute>} />
           
           {/* Admin Routes */}
           <Route path="/admin" element={<ProtectedRoute><AdminRoute><AdminDashboard /></AdminRoute></ProtectedRoute>} />

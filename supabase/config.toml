@@ -17,3 +17,9 @@ verify_jwt = false
 
 [functions.send-whatsapp-notification]
 verify_jwt = false
+
+[functions.mayar-checkout]
+verify_jwt = true
+
+[functions.mayar-webhook]
+verify_jwt = false
