@@ -42,7 +42,7 @@ serve(async (req) => {
     // Get user profile
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('name, email')
+      .select('name, email, phone')
       .eq('user_id', user.id)
       .single();
 
@@ -69,25 +69,29 @@ serve(async (req) => {
       throw new Error('Failed to create payment record');
     }
 
-    // Call Mayar API
-    const mayarResponse = await fetch('https://api.mayar.id/v1/invoices', {
+    // Calculate expiry date (7 days from now)
+    const expiryDate = new Date();
+    expiryDate.setDate(expiryDate.getDate() + 7);
+
+    // Call Mayar API with correct endpoint and format
+    const mayarResponse = await fetch('https://api.mayar.id/hl/v1/invoice/create', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${mayarApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        customer_name: profile.name || 'User',
-        customer_email: profile.email,
-        amount: packageData.price,
-        description: packageData.name,
-        redirect_url: `${supabaseUrl.replace('supabase.co', 'lovable.app')}/payment-success?payment_id=${paymentProof.id}`,
-        webhook_url: `${supabaseUrl}/functions/v1/mayar-webhook`,
-        metadata: {
-          payment_proof_id: paymentProof.id,
-          user_id: user.id,
-          package_id: package_id
-        }
+        name: profile.name || 'User',
+        email: profile.email,
+        mobile: profile.phone || '',
+        redirectUrl: `${supabaseUrl.replace('supabase.co', 'lovable.app')}/payment-success?payment_id=${paymentProof.id}`,
+        description: `Paket ${packageData.name}`,
+        expiredAt: expiryDate.toISOString(),
+        items: [{
+          quantity: 1,
+          rate: Number(packageData.price),
+          description: packageData.name
+        }]
       }),
     });
 
@@ -101,10 +105,21 @@ serve(async (req) => {
     
     console.log('Mayar invoice created:', mayarData);
 
+    // Update payment proof with Mayar transaction ID
+    if (mayarData.data?.transactionId) {
+      await supabase
+        .from('payment_proofs')
+        .update({
+          notes: `Mayar Transaction ID: ${mayarData.data.transactionId}`
+        })
+        .eq('id', paymentProof.id);
+    }
+
     return new Response(
       JSON.stringify({ 
-        checkout_url: mayarData.invoice_url || mayarData.checkout_url,
-        payment_id: paymentProof.id
+        checkout_url: mayarData.data?.link || '',
+        payment_id: paymentProof.id,
+        transaction_id: mayarData.data?.transactionId
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

@@ -281,18 +281,29 @@ export default function Subscription() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <CreditCard className="w-5 h-5" />
-                  Bayar Otomatis
+                  Bayar Otomatis dengan Mayar
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
                   <p className="text-sm text-muted-foreground">
-                    Bayar langsung dengan sistem pembayaran otomatis Mayar. Setelah pembayaran berhasil, langganan Anda akan langsung diperpanjang.
+                    Bayar langsung dengan sistem pembayaran otomatis Mayar. Setelah pembayaran berhasil, langganan Anda akan langsung diperpanjang secara otomatis.
                   </p>
+                  <div className="p-3 bg-blue-50 dark:bg-blue-950 rounded-lg text-sm">
+                    <p className="font-medium mb-2">📝 Cara kerja:</p>
+                    <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
+                      <li>Pilih paket di sebelah kiri</li>
+                      <li>Klik tombol "Bayar Sekarang"</li>
+                      <li>Anda akan diarahkan ke halaman pembayaran Mayar</li>
+                      <li>Selesaikan pembayaran</li>
+                      <li>Langganan otomatis diperpanjang</li>
+                    </ol>
+                  </div>
                   <Button 
                     onClick={handleMayarPayment} 
                     className="w-full" 
                     disabled={loading || !selectedPackage}
+                    size="lg"
                   >
                     {loading ? "Memproses..." : "Bayar Sekarang dengan Mayar"}
                   </Button>
