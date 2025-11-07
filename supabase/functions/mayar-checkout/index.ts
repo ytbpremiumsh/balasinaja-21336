@@ -115,6 +115,14 @@ serve(async (req) => {
         .eq('id', paymentProof.id);
     }
 
+    // Send notification to user with payment link
+    await supabase.from('notifications').insert({
+      user_id: user.id,
+      type: 'payment',
+      title: 'Link Pembayaran Dibuat',
+      message: `Link pembayaran untuk paket ${packageData.name} telah dibuat. Silakan selesaikan pembayaran melalui link yang tersedia. Link akan kadaluarsa dalam 7 hari.`
+    });
+
     return new Response(
       JSON.stringify({ 
         checkout_url: mayarData.data?.link || '',

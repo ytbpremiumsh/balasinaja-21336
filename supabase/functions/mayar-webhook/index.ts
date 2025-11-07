@@ -39,12 +39,12 @@ serve(async (req) => {
     const transactionId = data.id;
     const customerEmail = data.customerEmail;
 
-    // Find payment proof by transaction ID in notes or by customer email
+    // Find payment proof by transaction ID in notes
     const { data: paymentProofs, error: findError } = await supabase
       .from('payment_proofs')
-      .select('*, profiles!inner(email)')
+      .select('*')
       .eq('status', 'pending')
-      .or(`notes.ilike.%${transactionId}%,profiles.email.eq.${customerEmail}`)
+      .ilike('notes', `%${transactionId}%`)
       .order('created_at', { ascending: false })
       .limit(1);
 
