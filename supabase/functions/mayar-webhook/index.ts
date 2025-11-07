@@ -21,12 +21,12 @@ serve(async (req) => {
     console.log('Mayar webhook received:', JSON.stringify(webhookData));
 
     // Extract payment info from webhook - Mayar format
-    const eventType = webhookData.event?.received || '';
+    const eventType = webhookData.event || '';
     const data = webhookData.data || {};
     
-    // Only process payment.received events with true status
-    if (eventType !== 'payment.received' || !data.status) {
-      console.log('Skipping non-payment or unsuccessful event');
+    // Only process payment.received events with SUCCESS status
+    if (eventType !== 'payment.received' || data.status !== 'SUCCESS') {
+      console.log('Skipping non-payment or unsuccessful event', { eventType, status: data.status });
       return new Response(
         JSON.stringify({ success: true, message: 'Event ignored' }),
         { 
