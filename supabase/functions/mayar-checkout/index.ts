@@ -98,7 +98,14 @@ serve(async (req) => {
     if (!mayarResponse.ok) {
       const errorText = await mayarResponse.text();
       console.error('Mayar API error:', errorText);
-      throw new Error('Failed to create Mayar invoice');
+      
+      // Parse error message if possible
+      try {
+        const errorJson = JSON.parse(errorText);
+        throw new Error(errorJson.message || 'Failed to create Mayar invoice');
+      } catch {
+        throw new Error('Failed to create Mayar invoice: ' + errorText);
+      }
     }
 
     const mayarData = await mayarResponse.json();
