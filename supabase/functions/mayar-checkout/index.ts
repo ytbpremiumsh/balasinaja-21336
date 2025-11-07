@@ -27,6 +27,9 @@ serve(async (req) => {
     }
 
     const { package_id } = await req.json();
+    
+    // Get the origin from the request to use for redirect
+    const origin = req.headers.get('origin') || req.headers.get('referer')?.split('/').slice(0, 3).join('/') || supabaseUrl.replace('supabase.co', 'lovable.app');
 
     // Get package details
     const { data: packageData, error: packageError } = await supabase
@@ -84,7 +87,7 @@ serve(async (req) => {
         name: profile.name || 'User',
         email: profile.email,
         mobile: profile.phone || '',
-        redirectUrl: `${supabaseUrl.replace('supabase.co', 'lovable.app')}/payment-success?payment_id=${paymentProof.id}`,
+        redirectUrl: `${origin}/payment-success?payment_id=${paymentProof.id}`,
         description: `Paket ${packageData.name}`,
         expiredAt: expiryDate.toISOString(),
         items: [{
