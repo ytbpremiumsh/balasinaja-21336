@@ -1,9 +1,7 @@
 
--- Migration: 20251104120135
+-- Migration: 20251105131404
 
--- Migration: 20251104110714
-
--- Migration: 20251104093609
+-- Migration: 20251105121718
 
 -- Migration: 20251103022533
 
@@ -729,13 +727,10 @@ CREATE POLICY "Users can insert own broadcast_logs" ON public.broadcast_logs
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 
--- Migration: 20251104094224
--- Enable realtime for payment_proofs table
-ALTER PUBLICATION supabase_realtime ADD TABLE payment_proofs;
 
--- Migration: 20251104095915
+-- Migration: 20251105221919
 -- Create notifications table
-CREATE TABLE public.notifications (
+CREATE TABLE IF NOT EXISTS public.notifications (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID NOT NULL,
   type TEXT NOT NULL,
@@ -745,62 +740,121 @@ CREATE TABLE public.notifications (
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
 );
 
--- Enable Row Level Security
+-- Enable RLS
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 
--- Create policies for user access
+-- RLS Policies for notifications
 CREATE POLICY "Users can view own notifications"
-ON public.notifications
-FOR SELECT
-USING (auth.uid() = user_id);
+  ON public.notifications
+  FOR SELECT
+  USING (auth.uid() = user_id);
 
 CREATE POLICY "Users can update own notifications"
-ON public.notifications
-FOR UPDATE
-USING (auth.uid() = user_id);
+  ON public.notifications
+  FOR UPDATE
+  USING (auth.uid() = user_id);
 
--- Create policy for system to insert notifications
-CREATE POLICY "System can insert notifications"
-ON public.notifications
-FOR INSERT
-WITH CHECK (true);
+CREATE POLICY "Service role can insert notifications"
+  ON public.notifications
+  FOR INSERT
+  WITH CHECK (true);
 
--- Enable realtime
-ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
-
-
--- Migration: 20251104111230
--- Trigger types regeneration after project remix
--- This comment ensures the migration runs and updates the types file
-SELECT 1;
-
--- Migration: 20251104111313
--- Force types regeneration by creating and dropping a temporary table
-CREATE TABLE IF NOT EXISTS public.temp_types_refresh (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid()
+-- Create broadcast_templates table
+CREATE TABLE IF NOT EXISTS public.broadcast_templates (
+  id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID NOT NULL,
+  name TEXT NOT NULL,
+  message TEXT NOT NULL,
+  media_type TEXT,
+  media_url TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 
-DROP TABLE IF EXISTS public.temp_types_refresh;
+-- Enable RLS
+ALTER TABLE public.broadcast_templates ENABLE ROW LEVEL SECURITY;
 
--- Migration: 20251104111632
--- Add comment to profiles to trigger types regeneration
-COMMENT ON TABLE public.profiles IS 'User profile information including WhatsApp contact';
+-- RLS Policies for broadcast_templates
+CREATE POLICY "Users can view own templates"
+  ON public.broadcast_templates
+  FOR SELECT
+  USING (auth.uid() = user_id);
 
--- Ensure profiles table has required fields for WhatsApp notifications
--- name and phone already exist, just adding comment for clarity
-COMMENT ON COLUMN public.profiles.name IS 'User full name for identification';
-COMMENT ON COLUMN public.profiles.phone IS 'User WhatsApp number for notifications';
+CREATE POLICY "Users can insert own templates"
+  ON public.broadcast_templates
+  FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
 
--- Migration: 20251104111721
--- Update handle_new_user function to accept name and phone from metadata
+CREATE POLICY "Users can update own templates"
+  ON public.broadcast_templates
+  FOR UPDATE
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own templates"
+  ON public.broadcast_templates
+  FOR DELETE
+  USING (auth.uid() = user_id);
+
+-- Add missing columns to broadcast_logs if they don't exist
+ALTER TABLE public.broadcast_logs 
+  ADD COLUMN IF NOT EXISTS template_id UUID REFERENCES public.broadcast_templates(id),
+  ADD COLUMN IF NOT EXISTS media_type TEXT,
+  ADD COLUMN IF NOT EXISTS media_url TEXT,
+  ADD COLUMN IF NOT EXISTS scheduled_at TIMESTAMP WITH TIME ZONE,
+  ADD COLUMN IF NOT EXISTS delay_min INTEGER,
+  ADD COLUMN IF NOT EXISTS delay_max INTEGER,
+  ADD COLUMN IF NOT EXISTS use_personalization BOOLEAN;
+
+-- Create broadcast_queue table if not exists
+CREATE TABLE IF NOT EXISTS public.broadcast_queue (
+  id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  broadcast_log_id UUID REFERENCES public.broadcast_logs(id),
+  phone TEXT NOT NULL,
+  name TEXT,
+  message TEXT NOT NULL,
+  media_type TEXT,
+  media_url TEXT,
+  status TEXT DEFAULT 'pending',
+  scheduled_at TIMESTAMP WITH TIME ZONE,
+  sent_at TIMESTAMP WITH TIME ZONE,
+  error_message TEXT,
+  retry_count INTEGER DEFAULT 0,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+
+-- Enable RLS
+ALTER TABLE public.broadcast_queue ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies for broadcast_queue
+CREATE POLICY "Users can view own queue"
+  ON public.broadcast_queue
+  FOR SELECT
+  USING (EXISTS (
+    SELECT 1 FROM public.broadcast_logs
+    WHERE broadcast_logs.id = broadcast_queue.broadcast_log_id
+    AND broadcast_logs.user_id = auth.uid()
+  ));
+
+CREATE POLICY "Service role can manage queue"
+  ON public.broadcast_queue
+  FOR ALL
+  USING (true)
+  WITH CHECK (true);
+
+-- Add category_id to inbox if not exists
+ALTER TABLE public.inbox
+  ADD COLUMN IF NOT EXISTS category_id UUID REFERENCES public.categories(id);
+
+-- Migration: 20251105224533
+-- Update handle_new_user function to save name and phone from user metadata
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path TO 'public'
 AS $function$
 BEGIN
-  -- Insert profile with name and phone from metadata
+  -- Insert profile with name and phone from user metadata
   INSERT INTO public.profiles (user_id, email, name, phone, expire_at, status, plan)
   VALUES (
     new.id, 
@@ -829,73 +883,3 @@ BEGIN
   RETURN new;
 END;
 $function$;
-
-
--- Migration: 20251104120843
--- Add opt-in/opt-out and tags to contacts
-ALTER TABLE contacts 
-ADD COLUMN IF NOT EXISTS opt_in BOOLEAN DEFAULT true,
-ADD COLUMN IF NOT EXISTS tags TEXT[] DEFAULT '{}';
-
--- Create broadcast templates table
-CREATE TABLE IF NOT EXISTS broadcast_templates (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES auth.users(id) NOT NULL,
-  name TEXT NOT NULL,
-  message TEXT NOT NULL,
-  media_type TEXT DEFAULT 'text',
-  media_url TEXT,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
-);
-
-ALTER TABLE broadcast_templates ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Users can manage own templates"
-ON broadcast_templates
-FOR ALL
-USING (auth.uid() = user_id)
-WITH CHECK (auth.uid() = user_id);
-
--- Create broadcast queue table for managing send queue
-CREATE TABLE IF NOT EXISTS broadcast_queue (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  broadcast_log_id UUID REFERENCES broadcast_logs(id) ON DELETE CASCADE,
-  phone TEXT NOT NULL,
-  name TEXT,
-  message TEXT NOT NULL,
-  media_type TEXT DEFAULT 'text',
-  media_url TEXT,
-  status TEXT DEFAULT 'pending', -- pending, processing, sent, failed
-  error_message TEXT,
-  retry_count INTEGER DEFAULT 0,
-  scheduled_at TIMESTAMPTZ,
-  sent_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-
-ALTER TABLE broadcast_queue ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Users can view own queue"
-ON broadcast_queue
-FOR SELECT
-USING (EXISTS (
-  SELECT 1 FROM broadcast_logs 
-  WHERE broadcast_logs.id = broadcast_queue.broadcast_log_id 
-  AND broadcast_logs.user_id = auth.uid()
-));
-
--- Update broadcast_logs table
-ALTER TABLE broadcast_logs
-ADD COLUMN IF NOT EXISTS scheduled_at TIMESTAMPTZ,
-ADD COLUMN IF NOT EXISTS media_type TEXT DEFAULT 'text',
-ADD COLUMN IF NOT EXISTS media_url TEXT,
-ADD COLUMN IF NOT EXISTS template_id UUID REFERENCES broadcast_templates(id),
-ADD COLUMN IF NOT EXISTS delay_min INTEGER DEFAULT 1,
-ADD COLUMN IF NOT EXISTS delay_max INTEGER DEFAULT 3,
-ADD COLUMN IF NOT EXISTS use_personalization BOOLEAN DEFAULT false;
-
--- Create index for better performance
-CREATE INDEX IF NOT EXISTS idx_broadcast_queue_status ON broadcast_queue(status);
-CREATE INDEX IF NOT EXISTS idx_broadcast_queue_scheduled ON broadcast_queue(scheduled_at);
-CREATE INDEX IF NOT EXISTS idx_contacts_opt_in ON contacts(opt_in);

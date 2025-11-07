@@ -1,10 +1,1 @@
-project_id = "umfizxffrmzmvrregrlr"
-
-[functions.balasinaja]
-verify_jwt = false
-
-[functions.send-welcome-notification]
-verify_jwt = false
-
-[functions.send-subscription-notification]
-verify_jwt = false
+project_id = "zkjdpuzemxgxcxcbxomh"
