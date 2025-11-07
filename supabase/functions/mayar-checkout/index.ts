@@ -87,7 +87,7 @@ serve(async (req) => {
         name: profile.name || 'User',
         email: profile.email,
         mobile: profile.phone || '',
-        redirectUrl: `${origin}/payment-success?payment_id=${paymentProof.id}`,
+        redirectUrl: `${origin}/#/payment-success?payment_id=${paymentProof.id}`,
         description: `Paket ${packageData.name}`,
         expiredAt: expiryDate.toISOString(),
         items: [{
