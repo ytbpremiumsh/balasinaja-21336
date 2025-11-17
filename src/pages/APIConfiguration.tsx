@@ -30,6 +30,8 @@ export default function APIConfiguration() {
   const [aiModel, setAiModel] = useState("");
   const [systemPrompt, setSystemPrompt] = useState("");
   const [aiReplyEnabled, setAiReplyEnabled] = useState(true);
+  const [aiDelayMin, setAiDelayMin] = useState("5");
+  const [aiDelayMax, setAiDelayMax] = useState("15");
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -53,6 +55,8 @@ export default function APIConfiguration() {
       setAiModel(map.ai_model || "");
       setSystemPrompt(map.system_prompt || "");
       setAiReplyEnabled(map.ai_reply_enabled === "true");
+      setAiDelayMin(map.ai_delay_min || "5");
+      setAiDelayMax(map.ai_delay_max || "15");
     } catch (err) {
       console.error("Error loading settings:", err);
       toast({
@@ -79,6 +83,8 @@ export default function APIConfiguration() {
         { key: "ai_model", value: aiModel },
         { key: "system_prompt", value: systemPrompt },
         { key: "ai_reply_enabled", value: aiReplyEnabled ? "true" : "false" },
+        { key: "ai_delay_min", value: aiDelayMin },
+        { key: "ai_delay_max", value: aiDelayMax },
       ];
 
       for (const s of settingsToUpdate) {
@@ -113,11 +119,19 @@ export default function APIConfiguration() {
   };
 
   const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/balasinaja?user_id=${user?.id || "YOUR_USER_ID"}`;
+  const mayarWebhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/mayar-webhook`;
 
   const copyWebhook = () => {
     navigator.clipboard.writeText(webhookUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const [copiedMayar, setCopiedMayar] = useState(false);
+  const copyMayarWebhook = () => {
+    navigator.clipboard.writeText(mayarWebhookUrl);
+    setCopiedMayar(true);
+    setTimeout(() => setCopiedMayar(false), 2000);
   };
 
   if (loading) {
@@ -144,26 +158,44 @@ export default function APIConfiguration() {
           </p>
         </div>
 
-        {/* WEBHOOK URL */}
+        {/* WEBHOOK URLs */}
         <Card>
           <CardHeader>
-            <CardTitle>Webhook Anda</CardTitle>
+            <CardTitle>Webhook URLs</CardTitle>
             <CardDescription>
-              Setiap user memiliki URL webhook unik untuk menerima pesan dari OneSender / WA Gateway.
+              URL webhook untuk integrasi dengan layanan eksternal
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="rounded-lg bg-muted p-4 flex items-center gap-2">
-              <code className="text-xs bg-background rounded px-3 py-2 flex-1 overflow-x-auto break-all">
-                {webhookUrl}
-              </code>
-              <Button variant="outline" size="icon" onClick={copyWebhook}>
-                {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
-              </Button>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label className="font-semibold">Webhook OneSender / WhatsApp Gateway</Label>
+              <div className="rounded-lg bg-muted p-4 flex items-center gap-2">
+                <code className="text-xs bg-background rounded px-3 py-2 flex-1 overflow-x-auto break-all">
+                  {webhookUrl}
+                </code>
+                <Button variant="outline" size="icon" onClick={copyWebhook}>
+                  {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+                </Button>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Gunakan URL ini di dashboard OneSender Anda untuk menerima pesan masuk.
+              </p>
             </div>
-            <p className="text-sm text-muted-foreground">
-              Gunakan URL ini di dashboard OneSender Anda. Sistem akan otomatis memproses pesan sesuai user ID Anda.
-            </p>
+
+            <div className="space-y-2">
+              <Label className="font-semibold">Webhook Mayar Payment</Label>
+              <div className="rounded-lg bg-muted p-4 flex items-center gap-2">
+                <code className="text-xs bg-background rounded px-3 py-2 flex-1 overflow-x-auto break-all">
+                  {mayarWebhookUrl}
+                </code>
+                <Button variant="outline" size="icon" onClick={copyMayarWebhook}>
+                  {copiedMayar ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+                </Button>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Gunakan URL ini di dashboard Mayar untuk notifikasi pembayaran otomatis.
+              </p>
+            </div>
           </CardContent>
         </Card>
 
@@ -269,6 +301,37 @@ export default function APIConfiguration() {
                 onChange={(e) => setSystemPrompt(e.target.value)}
                 placeholder="Tulis prompt dasar untuk AI"
               />
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Delay Minimal (detik)</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  max="60"
+                  value={aiDelayMin}
+                  onChange={(e) => setAiDelayMin(e.target.value)}
+                  placeholder="5"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Waktu tunggu minimum sebelum AI membalas (mencegah spam)
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label>Delay Maksimal (detik)</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  max="120"
+                  value={aiDelayMax}
+                  onChange={(e) => setAiDelayMax(e.target.value)}
+                  placeholder="15"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Waktu tunggu maksimum agar terlihat natural
+                </p>
+              </div>
             </div>
           </CardContent>
         </Card>
